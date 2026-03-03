@@ -7,31 +7,57 @@ export function register(p: Plugin) {
   plugins.push(p)
 }
 
+// types worth expanding into on second pass
+const EXPANDABLE: NodeType[] = ['Username', 'Domain', 'IP', 'Repository']
+
 export async function runPlugins(seeds: SeedNode[], keys: KeyRing) {
   let nodes = 0
   let edges = 0
+  const seen = new Set(seeds.map(s => `${s.type}:${s.value}`))
 
-  for (const seed of seeds) {
-    const applicable = plugins.filter(p => p.accepts.includes(seed.type))
+  const runBatch = async (batch: SeedNode[]) => {
+    const discovered: SeedNode[] = []
 
-    for (const p of applicable) {
-      if (p.requiresKey && !keys.get(p.id)) continue
+    for (const seed of batch) {
+      const applicable = plugins.filter(p => p.accepts.includes(seed.type))
 
-      try {
-        const res = await p.run(seed, keys)
+      for (const p of applicable) {
+        if (p.requiresKey && !keys.get(p.id)) continue
 
-        for (const n of res.nodes) {
-          await storeNode(n.label, n.key, n.props)
-          nodes++
+        try {
+          const res = await p.run(seed, keys)
+
+          for (const n of res.nodes) {
+            await storeNode(n.label, n.key, n.props)
+            nodes++
+
+            // collect new seeds for second pass
+            const k = `${n.label}:${n.props[n.key]}`
+            if (EXPANDABLE.includes(n.label) && !seen.has(k)) {
+              seen.add(k)
+              discovered.push({ type: n.label, key: n.key, value: n.props[n.key] })
+            }
+          }
+          for (const e of res.edges) {
+            await storeEdge(e.fromLabel, e.fromKey, e.fromVal, e.toLabel, e.toKey, e.toVal, e.rel)
+            edges++
+          }
+        } catch (err) {
+          console.log(`[!] ${p.id}: ${(err as Error).message}`)
         }
-        for (const e of res.edges) {
-          await storeEdge(e.fromLabel, e.fromKey, e.fromVal, e.toLabel, e.toKey, e.toVal, e.rel)
-          edges++
-        }
-      } catch (err) {
-        console.log(`[!] ${p.id}: ${(err as Error).message}`)
       }
     }
+
+    return discovered
+  }
+
+  // first pass
+  const secondary = await runBatch(seeds)
+
+  // second pass — expand discovered nodes
+  if (secondary.length > 0) {
+    console.log(`[*] expanding ${secondary.length} discovered nodes`)
+    await runBatch(secondary)
   }
 
   return { nodes, edges }
