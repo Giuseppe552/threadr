@@ -1,4 +1,5 @@
 import dns from 'node:dns/promises'
+import crypto from 'node:crypto'
 
 const seed = process.argv[2]
 
@@ -82,8 +83,36 @@ async function resolve(subdomains: string[]) {
   }
 }
 
+async function gravatar(email: string) {
+  const hash = crypto.createHash('md5').update(email.trim().toLowerCase()).digest('hex')
+  const url = `https://gravatar.com/${hash}.json`
+  console.log(`\n[*] gravatar: ${hash}`)
+
+  const res = await fetch(url)
+  if (res.status === 404) {
+    console.log('[-] gravatar: no profile')
+    return
+  }
+  if (!res.ok) {
+    console.log(`[!] gravatar: ${res.status}`)
+    return
+  }
+
+  const data = await res.json()
+  const profile = data.entry?.[0]
+  if (profile) {
+    console.log(`[+] gravatar: ${profile.displayName || 'unknown'}`)
+    if (profile.profileUrl) console.log(`    url: ${profile.profileUrl}`)
+    if (profile.photos?.[0]) console.log(`    photo: ${profile.photos[0].value}`)
+  }
+}
+
 async function main() {
   await ghLookup(seed)
+
+  if (seed.includes('@')) {
+    await gravatar(seed)
+  }
 
   const domain = seed.includes('@') ? seed.split('@')[1] : null
   if (domain) {
