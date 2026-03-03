@@ -43,4 +43,39 @@ async function ghLookup(email: string) {
   }
 }
 
-ghLookup(seed)
+// crt.sh cert transparency
+async function crtsh(domain: string) {
+  console.log(`[*] crt.sh lookup: ${domain}`)
+  const res = await fetch(`https://crt.sh/?q=%25.${domain}&output=json`)
+
+  if (!res.ok) {
+    console.log(`[!] crt.sh: ${res.status}`)
+    return []
+  }
+
+  const certs = await res.json()
+  const names = new Set<string>()
+  for (const c of certs) {
+    const val = c.name_value as string
+    val.split('\n').forEach((n: string) => names.add(n.toLowerCase()))
+  }
+
+  const subs = [...names].filter(n => n !== domain && !n.startsWith('*'))
+  console.log(`[+] found ${subs.length} subdomains`)
+  for (const s of subs.slice(0, 20)) {
+    console.log(`    ${s}`)
+  }
+  return subs
+}
+
+async function main() {
+  await ghLookup(seed)
+
+  // if seed is an email, pull domain
+  const domain = seed.includes('@') ? seed.split('@')[1] : null
+  if (domain) {
+    await crtsh(domain)
+  }
+}
+
+main()
