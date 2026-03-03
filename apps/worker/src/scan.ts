@@ -2,6 +2,7 @@ import dns from 'node:dns/promises'
 import crypto from 'node:crypto'
 import { storeNode, storeEdge } from './graph.js'
 import { checkSocial } from './social.js'
+import { runPlugins } from './runner.js'
 
 let nodeCount = 0
 let edgeCount = 0

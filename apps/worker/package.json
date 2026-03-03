@@ -9,6 +9,7 @@
     "test": "echo 'no tests'"
   },
   "dependencies": {
+    "@threadr/shared": "*",
     "better-sqlite3": "^12.6.2",
     "bullmq": "^5.70.1",
     "neo4j-driver": "^6.0.1"
