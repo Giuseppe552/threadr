@@ -1,5 +1,6 @@
 import dns from 'node:dns/promises'
 import crypto from 'node:crypto'
+import neo4j from 'neo4j-driver'
 
 const seed = process.argv[2]
 
@@ -107,6 +108,25 @@ async function gravatar(email: string) {
   }
 }
 
+// neo4j - trying to store results in graph
+const driver = neo4j.driver(
+  'bolt://localhost:7687',
+  neo4j.auth.basic('neo4j', 'threadr123')
+)
+
+async function storeInGraph(label: string, props: Record<string, string>) {
+  const session = driver.session()
+  try {
+    // TODO: pretty sure CREATE will make dupes, fix later
+    await session.run(
+      `CREATE (n:${label} $props) RETURN n`,
+      { props }
+    )
+  } finally {
+    await session.close()
+  }
+}
+
 async function main() {
   await ghLookup(seed)
 
@@ -121,6 +141,16 @@ async function main() {
       await resolve(subs)
     }
   }
+
+  // try storing seed in neo4j
+  try {
+    await storeInGraph('Email', { address: seed })
+    console.log('\n[+] stored in neo4j')
+  } catch (e) {
+    console.log(`\n[!] neo4j failed: ${e}`)
+  }
+
+  await driver.close()
 }
 
 main()
