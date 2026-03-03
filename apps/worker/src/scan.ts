@@ -1,87 +1,44 @@
-import dns from 'node:dns/promises'
-import crypto from 'node:crypto'
+import { detectSeedType } from '@threadr/shared'
+import type { SeedNode, NodeType } from '@threadr/shared'
 import { storeNode, storeEdge } from './graph.js'
 import { runPlugins } from './runner.js'
+import { keyring } from './keyring.js'
 
-let nodeCount = 0
-let edgeCount = 0
-
-async function trackNode(label: string, key: string, props: Record<string, string>) {
-  await storeNode(label, key, props)
-  nodeCount++
-}
-
-async function trackEdge(
-  fl: string, fk: string, fv: string,
-  tl: string, tk: string, tv: string,
-  rel: string
-) {
-  await storeEdge(fl, fk, fv, tl, tk, tv, rel)
-  edgeCount++
+const seedTypeToNode: Record<string, { label: NodeType; key: string }> = {
+  email: { label: 'Email', key: 'address' },
+  domain: { label: 'Domain', key: 'name' },
+  username: { label: 'Username', key: 'name' },
+  phone: { label: 'Phone', key: 'number' },
 }
 
 export async function runScan(_scanId: string, seed: string) {
-  nodeCount = 0
-  edgeCount = 0
   console.log(`[*] scanning: ${seed}`)
 
-  await trackNode('Email', 'address', { address: seed })
+  const type = detectSeedType(seed)
+  const { label, key } = seedTypeToNode[type]
 
-  if (seed.includes('@')) {
+  // create seed node
+  await storeNode(label, key, { [key]: seed })
+  let nodes = 1
+  let edges = 0
+
+  // if email, also create domain node + edge
+  if (type === 'email') {
     const domain = seed.split('@')[1]
-    await trackNode('Domain', 'name', { name: domain })
-    await trackEdge('Email', 'address', seed, 'Domain', 'name', domain, 'OWNS')
+    await storeNode('Domain', 'name', { name: domain })
+    await storeEdge('Email', 'address', seed, 'Domain', 'name', domain, 'OWNS')
+    nodes++
+    edges++
   }
 
-  // github + crtsh moved to plugins, social still inline for now
-  if (seed.includes('@')) {
-    await gravatar(seed)
+  const seeds: SeedNode[] = [{ type: label, key, value: seed }]
+  if (type === 'email') {
+    seeds.push({ type: 'Domain', key: 'name', value: seed.split('@')[1] })
   }
 
-  const domain = seed.includes('@') ? seed.split('@')[1] : null
-  if (domain) {
-    await dnsRecords(domain)
-  }
+  const stats = await runPlugins(seeds, keyring)
+  nodes += stats.nodes
+  edges += stats.edges
 
-  return { nodes: nodeCount, edges: edgeCount }
-}
-
-
-async function dnsRecords(domain: string) {
-  try {
-    const mx = await dns.resolveMx(domain)
-    for (const m of mx) {
-      console.log(`[+] MX: ${m.exchange}`)
-      await trackNode('Domain', 'name', { name: m.exchange })
-      await trackEdge('Domain', 'name', domain, 'Domain', 'name', m.exchange, 'HAS_MX')
-    }
-  } catch { /* no mx */ }
-
-  try {
-    const txt = await dns.resolveTxt(domain)
-    for (const t of txt) {
-      const val = t.join('')
-      if (val.includes('v=spf') || val.includes('google') || val.includes('microsoft')) {
-        console.log(`[+] TXT: ${val.slice(0, 80)}`)
-      }
-    }
-  } catch { /* no txt */ }
-}
-
-async function gravatar(email: string) {
-  const hash = crypto.createHash('md5').update(email.trim().toLowerCase()).digest('hex')
-  const res = await fetch(`https://gravatar.com/${hash}.json`)
-
-  if (!res.ok) return
-
-  const data = await res.json()
-  const profile = data.entry?.[0]
-  if (profile?.displayName) {
-    console.log(`[+] gravatar: ${profile.displayName}`)
-    await trackNode('Person', 'name', {
-      name: profile.displayName,
-      source: 'gravatar',
-    })
-    await trackEdge('Email', 'address', email, 'Person', 'name', profile.displayName, 'LINKED_TO')
-  }
+  return { nodes, edges }
 }
