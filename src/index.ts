@@ -1,3 +1,5 @@
+import dns from 'node:dns/promises'
+
 const seed = process.argv[2]
 
 if (!seed) {
@@ -68,13 +70,27 @@ async function crtsh(domain: string) {
   return subs
 }
 
+async function resolve(subdomains: string[]) {
+  console.log(`\n[*] resolving ${subdomains.length} subdomains`)
+  for (const sub of subdomains.slice(0, 15)) {
+    try {
+      const addrs = await dns.resolve4(sub)
+      console.log(`[+] ${sub} -> ${addrs.join(', ')}`)
+    } catch {
+      // nxdomain or timeout, skip
+    }
+  }
+}
+
 async function main() {
   await ghLookup(seed)
 
-  // if seed is an email, pull domain
   const domain = seed.includes('@') ? seed.split('@')[1] : null
   if (domain) {
-    await crtsh(domain)
+    const subs = await crtsh(domain)
+    if (subs.length) {
+      await resolve(subs)
+    }
   }
 }
 
