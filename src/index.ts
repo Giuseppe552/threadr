@@ -114,13 +114,13 @@ const driver = neo4j.driver(
   neo4j.auth.basic('neo4j', 'threadr123')
 )
 
-async function storeInGraph(label: string, props: Record<string, string>) {
+async function storeNode(label: string, key: string, props: Record<string, string>) {
   const session = driver.session()
   try {
-    // TODO: pretty sure CREATE will make dupes, fix later
+    // MERGE instead of CREATE so we don't get dupes
     await session.run(
-      `CREATE (n:${label} $props) RETURN n`,
-      { props }
+      `MERGE (n:${label} {${key}: $val}) SET n += $props RETURN n`,
+      { val: props[key], props }
     )
   } finally {
     await session.close()
@@ -144,7 +144,7 @@ async function main() {
 
   // try storing seed in neo4j
   try {
-    await storeInGraph('Email', { address: seed })
+    await storeNode('Email', 'address', { address: seed })
     console.log('\n[+] stored in neo4j')
   } catch (e) {
     console.log(`\n[!] neo4j failed: ${e}`)
