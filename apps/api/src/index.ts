@@ -129,6 +129,59 @@ app.get('/settings/plugins', (c) => {
   return c.json(plugins)
 })
 
+// --- alerts ---
+
+app.get('/alerts', (c) => {
+  const scanId = c.req.query('scan_id')
+  const severity = c.req.query('severity')
+  let sql = 'SELECT * FROM alerts WHERE 1=1'
+  const params: string[] = []
+  if (scanId) { sql += ' AND scan_id = ?'; params.push(scanId) }
+  if (severity) { sql += ' AND severity = ?'; params.push(severity) }
+  sql += ' ORDER BY created_at DESC LIMIT 100'
+  const rows = db.prepare(sql).all(...params)
+  return c.json(rows)
+})
+
+app.get('/alerts/count', (c) => {
+  const row = db.prepare('SELECT COUNT(*) as count FROM alerts WHERE seen = 0').get() as { count: number }
+  return c.json({ count: row.count })
+})
+
+app.post('/alerts/:id/seen', (c) => {
+  db.prepare('UPDATE alerts SET seen = 1 WHERE id = ?').run(c.req.param('id'))
+  return c.json({ ok: true })
+})
+
+// --- monitors ---
+
+app.get('/monitors', (c) => {
+  const rows = db.prepare(`
+    SELECT m.*, s.seed FROM monitors m JOIN scans s ON m.scan_id = s.id ORDER BY m.next_run
+  `).all()
+  return c.json(rows)
+})
+
+app.post('/monitor', async (c) => {
+  const body = await c.req.json()
+  const { scan_id, interval } = body
+  if (!scan_id || !interval) return c.json({ error: 'scan_id and interval required' }, 400)
+
+  const id = randomUUID()
+  const next = new Date()
+  if (interval === 'hourly') next.setHours(next.getHours() + 1)
+  else if (interval === 'daily') next.setDate(next.getDate() + 1)
+  else next.setDate(next.getDate() + 7)
+
+  db.prepare('INSERT INTO monitors (id, scan_id, interval, next_run) VALUES (?, ?, ?, ?)').run(id, scan_id, interval, next.toISOString())
+  return c.json({ id, scan_id, interval }, 201)
+})
+
+app.delete('/monitor/:id', (c) => {
+  db.prepare('DELETE FROM monitors WHERE id = ?').run(c.req.param('id'))
+  return c.json({ ok: true })
+})
+
 serve({ fetch: app.fetch, port: 3001 }, (info) => {
   console.log(`api running on :${info.port}`)
 })
