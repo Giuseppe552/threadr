@@ -1,4 +1,5 @@
 import type { KeyRing } from '@threadr/shared'
+import { db } from './db.js'
 
 interface KeyState {
   keys: string[]
@@ -10,6 +11,20 @@ const state = new Map<string, KeyState>()
 
 export function loadKeys(pluginId: string, keys: string[]) {
   state.set(pluginId, { keys, current: 0, burned: new Set() })
+}
+
+export function loadKeysFromDb() {
+  const rows = db.prepare('SELECT plugin_id, key_value FROM api_keys WHERE active = 1').all() as { plugin_id: string; key_value: string }[]
+  const grouped = new Map<string, string[]>()
+  for (const r of rows) {
+    const arr = grouped.get(r.plugin_id) || []
+    arr.push(r.key_value)
+    grouped.set(r.plugin_id, arr)
+  }
+  for (const [pid, keys] of grouped) {
+    loadKeys(pid, keys)
+  }
+  console.log(`[*] loaded keys for ${grouped.size} plugins`)
 }
 
 export const keyring: KeyRing = {

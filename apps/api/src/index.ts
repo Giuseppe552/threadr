@@ -68,6 +68,45 @@ app.post('/scan/:id/expand', async (c) => {
   return c.json({ status: 'expanding', seed })
 })
 
+// --- settings ---
+
+app.get('/settings/keys', (c) => {
+  const rows = db.prepare('SELECT id, plugin_id, label, active FROM api_keys ORDER BY plugin_id').all()
+  return c.json(rows)
+})
+
+app.post('/settings/keys', async (c) => {
+  const body = await c.req.json()
+  const { plugin_id, key_value, label } = body
+  if (!plugin_id || !key_value) return c.json({ error: 'plugin_id and key_value required' }, 400)
+
+  const id = randomUUID()
+  db.prepare('INSERT INTO api_keys (id, plugin_id, key_value, label) VALUES (?, ?, ?, ?)').run(id, plugin_id, key_value, label || '')
+  return c.json({ id, plugin_id, label }, 201)
+})
+
+app.delete('/settings/keys/:id', (c) => {
+  db.prepare('DELETE FROM api_keys WHERE id = ?').run(c.req.param('id'))
+  return c.json({ ok: true })
+})
+
+app.get('/settings/plugins', (c) => {
+  // static list — worker knows the real registry but this is good enough for the UI
+  const plugins = [
+    { id: 'github', name: 'GitHub', requiresKey: false },
+    { id: 'crtsh', name: 'Certificate Transparency', requiresKey: false },
+    { id: 'dns', name: 'DNS Records', requiresKey: false },
+    { id: 'gravatar', name: 'Gravatar', requiresKey: false },
+    { id: 'social', name: 'Social Profiles', requiresKey: false },
+    { id: 'shodan', name: 'Shodan', requiresKey: true },
+    { id: 'git-emails', name: 'Git Email Scraper', requiresKey: false },
+    { id: 'whois', name: 'WHOIS', requiresKey: false },
+    { id: 'virustotal', name: 'VirusTotal', requiresKey: true },
+    { id: 'pgp', name: 'PGP Keyserver', requiresKey: false },
+  ]
+  return c.json(plugins)
+})
+
 serve({ fetch: app.fetch, port: 3001 }, (info) => {
   console.log(`api running on :${info.port}`)
 })
