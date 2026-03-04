@@ -8,7 +8,7 @@ export function Layout() {
         <div className="flex gap-4 text-xs text-text-muted">
           <Link to="/" className="hover:text-text">scans</Link>
           <span className="text-border">|</span>
-          <span className="cursor-not-allowed">alerts</span>
+          <Link to="/alerts" className="hover:text-text">alerts</Link>
           <span className="text-border">|</span>
           <Link to="/settings" className="hover:text-text">settings</Link>
         </div>
