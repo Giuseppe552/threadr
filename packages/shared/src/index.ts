@@ -70,3 +70,5 @@ export interface KeyRing {
   get(pluginId: string): string | null
   markBurned(pluginId: string, key: string): void
 }
+
+export { jaro, jaroWinkler } from './scoring.js'
