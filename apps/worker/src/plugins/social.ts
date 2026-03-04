@@ -33,7 +33,7 @@ export const social: Plugin = {
           headers: { 'User-Agent': 'threadr/0.1' },
         })
 
-        if (res.status === 200) {
+        if (res.status === 200) { // lots of false positives, linkedin especially
           console.log(`[+] ${p.name}: found`)
           nodes.push({
             label: 'Username', key: 'name',

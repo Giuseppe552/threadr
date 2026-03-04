@@ -8,7 +8,6 @@ export function register(p: Plugin) {
   plugins.push(p)
 }
 
-// types worth expanding into on second pass
 const EXPANDABLE: NodeType[] = ['Username', 'Domain', 'IP', 'Repository']
 
 export async function runPlugins(seeds: SeedNode[], keys: KeyRing) {
@@ -32,7 +31,6 @@ export async function runPlugins(seeds: SeedNode[], keys: KeyRing) {
             await storeNode(n.label, n.key, n.props)
             nodes++
 
-            // collect new seeds for second pass
             const k = `${n.label}:${n.props[n.key]}`
             if (EXPANDABLE.includes(n.label) && !seen.has(k)) {
               seen.add(k)
@@ -52,16 +50,14 @@ export async function runPlugins(seeds: SeedNode[], keys: KeyRing) {
     return discovered
   }
 
-  // first pass
   const secondary = await runBatch(seeds)
 
-  // second pass — expand discovered nodes
+  // FIXME: should probably cap expansion depth at some point
   if (secondary.length > 0) {
     console.log(`[*] expanding ${secondary.length} discovered nodes`)
     await runBatch(secondary)
   }
 
-  // entity resolution after all plugins ran
   await resolve()
 
   return { nodes, edges }

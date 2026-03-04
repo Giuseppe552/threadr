@@ -9,16 +9,16 @@ export const dnsPlugin: Plugin = {
   rateLimit: { requests: 30, windowMs: 60_000 },
 
   async run(seed, _keys): Promise<PluginResult> {
-    const nodes: PluginResult['nodes'] = []
-    const edges: PluginResult['edges'] = []
+    const found: PluginResult['nodes'] = []
+    const rels: PluginResult['edges'] = []
     const domain = seed.value
 
     try {
       const mx = await dns.resolveMx(domain)
       for (const m of mx) {
         console.log(`[+] MX: ${m.exchange}`)
-        nodes.push({ label: 'Domain', key: 'name', props: { name: m.exchange } })
-        edges.push({
+        found.push({ label: 'Domain', key: 'name', props: { name: m.exchange } })
+        rels.push({
           fromLabel: 'Domain', fromKey: 'name', fromVal: domain,
           toLabel: 'Domain', toKey: 'name', toVal: m.exchange, rel: 'HAS_MX',
         })
@@ -35,6 +35,6 @@ export const dnsPlugin: Plugin = {
       }
     } catch { /* no txt */ }
 
-    return { nodes, edges }
+    return { nodes: found, edges: rels }
   },
 }

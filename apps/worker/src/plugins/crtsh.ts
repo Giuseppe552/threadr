@@ -14,7 +14,7 @@ export const crtsh: Plugin = {
     const domain = seed.value
 
     console.log(`[*] crt.sh: ${domain}`)
-    const res = await fetch(`https://crt.sh/?q=%25.${domain}&output=json`)
+    const res = await fetch(`https://crt.sh/?q=%25.${domain}&output=json`) // crt.sh is slow sometimes
     if (!res.ok) {
       console.log(`[!] crt.sh: ${res.status}`)
       return { nodes, edges }

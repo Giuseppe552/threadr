@@ -21,12 +21,10 @@ export const gitEmails: Plugin = {
     const edges: PluginResult['edges'] = []
     const repoUrl = seed.value
 
-    // need a clone-able url
     const url = repoUrl.startsWith('http')
       ? repoUrl
       : `https://github.com/${repoUrl}`
 
-    // bail if git isn't installed
     try {
       await exec('which', ['git'])
     } catch {
@@ -39,7 +37,7 @@ export const gitEmails: Plugin = {
       tmp = await mkdtemp(path.join(tmpdir(), 'threadr-git-'))
 
       console.log(`[*] git-emails: cloning ${url}`)
-      await exec('git', ['clone', '--bare', '--depth=50', url, tmp], { timeout: 30_000 })
+      await exec('git', ['clone', '--bare', '--depth=50', url, tmp], { timeout: 30_000 }) // 30s should be enough
 
       const { stdout } = await exec('git', ['log', '--format=%ae|%an', '--all'], { cwd: tmp, timeout: 10_000 })
 

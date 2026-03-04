@@ -14,6 +14,7 @@ function query(host: string, data: string, timeout = 5_000): Promise<string> {
   })
 }
 
+// every registrar formats this differently, best effort
 function parseWhois(raw: string): Record<string, string> {
   const out: Record<string, string> = {}
   for (const line of raw.split('\n')) {
@@ -40,12 +41,10 @@ export const whois: Plugin = {
     console.log(`[*] whois: ${domain}`)
 
     try {
-      // step 1: find authoritative server
       const ianaRes = await query('whois.iana.org', domain)
       const referMatch = ianaRes.match(/refer:\s*(\S+)/i)
       const server = referMatch?.[1] || 'whois.verisign-grs.com'
 
-      // step 2: actual lookup
       const raw = await query(server, domain)
       const parsed = parseWhois(raw)
 
@@ -70,7 +69,7 @@ export const whois: Plugin = {
         })
       }
 
-      // stash whois data as props on domain — used by monitoring for change detection
+      // monitoring diffs these props for change detection
       const props: Record<string, string> = { name: domain }
       if (created) props.whois_created = created
       if (expires) props.whois_expires = expires

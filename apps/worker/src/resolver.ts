@@ -73,6 +73,7 @@ export async function resolve() {
   let merged = 0
   let suggested = 0
 
+  // TODO: O(n²) — fine for now but gonna hurt with lots of persons
   for (let i = 0; i < persons.length; i++) {
     for (let j = i + 1; j < persons.length; j++) {
       const a = toFields(persons[i])

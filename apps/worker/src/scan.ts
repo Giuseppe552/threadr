@@ -39,12 +39,10 @@ export async function runScan(_scanId: string, seed: string) {
   const type = detectSeedType(seed)
   const { label, key } = seedTypeToNode[type]
 
-  // create seed node
   await storeNode(label, key, { [key]: seed })
   let nodes = 1
   let edges = 0
 
-  // if email, also create domain node + edge
   if (type === 'email') {
     const domain = seed.split('@')[1]
     await storeNode('Domain', 'name', { name: domain })

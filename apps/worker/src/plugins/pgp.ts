@@ -41,7 +41,6 @@ export const pgp: Plugin = {
         const parts = line.split(':')
         const raw = parts[1] || ''
         const decoded = decodeURIComponent(raw.replace(/\+/g, ' '))
-        // extract name from "Name <email>" or just "Name"
         const nameMatch = decoded.match(/^([^<]+)/)
         const name = nameMatch?.[1]?.trim()
         if (name && name !== seed.value) {
