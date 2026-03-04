@@ -70,14 +70,13 @@ export const whois: Plugin = {
         })
       }
 
-      // stash dates as props on domain — handy for monitoring changes later
-      if (created || expires) {
-        const props: Record<string, string> = { name: domain }
-        if (created) props.whois_created = created
-        if (expires) props.whois_expires = expires
-        if (registrar) props.whois_registrar = registrar
-        nodes.push({ label: 'Domain', key: 'name', props })
-      }
+      // stash whois data as props on domain — used by monitoring for change detection
+      const props: Record<string, string> = { name: domain }
+      if (created) props.whois_created = created
+      if (expires) props.whois_expires = expires
+      if (registrar) props.whois_registrar = registrar
+      if (registrant) props.whois_registrant = registrant
+      nodes.push({ label: 'Domain', key: 'name', props })
     } catch (err) {
       console.log(`[!] whois: ${(err as Error).message}`)
     }

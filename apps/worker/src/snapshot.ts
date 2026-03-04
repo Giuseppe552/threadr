@@ -63,7 +63,8 @@ export function diffSnapshots(before: Snapshot, after: Snapshot): SnapshotDiff {
       // check prop changes on existing nodes
       const oldProps = before.nodes.get(id)!.props
       for (const [k, v] of Object.entries(data.props)) {
-        if (oldProps[k] !== v) {
+        // toString() to normalize neo4j Integer types
+        if (String(oldProps[k] ?? '') !== String(v ?? '')) {
           diff.changedProps.push({ id, label: data.label, field: k, before: oldProps[k], after: v })
         }
       }
