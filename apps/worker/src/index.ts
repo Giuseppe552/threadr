@@ -1,6 +1,9 @@
 import { Worker } from 'bullmq'
 import { runScan } from './scan.js'
 import { db } from './db.js'
+import { loadKeysFromDb } from './keyring.js'
+
+loadKeysFromDb()
 
 const worker = new Worker(
   'scans',

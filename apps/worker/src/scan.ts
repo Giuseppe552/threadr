@@ -1,8 +1,30 @@
 import { detectSeedType } from '@threadr/shared'
 import type { SeedNode, NodeType } from '@threadr/shared'
 import { storeNode, storeEdge } from './graph.js'
-import { runPlugins } from './runner.js'
+import { register, runPlugins } from './runner.js'
 import { keyring } from './keyring.js'
+
+import { github } from './plugins/github.js'
+import { crtsh } from './plugins/crtsh.js'
+import { dnsPlugin } from './plugins/dns.js'
+import { gravatar } from './plugins/gravatar.js'
+import { social } from './plugins/social.js'
+import { shodan } from './plugins/shodan.js'
+import { gitEmails } from './plugins/git-emails.js'
+import { whois } from './plugins/whois.js'
+import { virustotal } from './plugins/virustotal.js'
+import { pgp } from './plugins/pgp.js'
+
+register(github)
+register(crtsh)
+register(dnsPlugin)
+register(gravatar)
+register(social)
+register(shodan)
+register(gitEmails)
+register(whois)
+register(virustotal)
+register(pgp)
 
 const seedTypeToNode: Record<string, { label: NodeType; key: string }> = {
   email: { label: 'Email', key: 'address' },
