@@ -118,4 +118,33 @@ describe('entity comparison', () => {
     const score = computeScore(breakdown)
     expect(score).toBeLessThanOrEqual(0.6)
   })
+
+  it('single email match also capped', () => {
+    const a: EntityFields = {
+      emails: ['same@test.com'],
+      phones: [],
+      avatarHash: null,
+      usernames: [],
+      names: [],
+    }
+    const b: EntityFields = {
+      emails: ['same@test.com'],
+      phones: [],
+      avatarHash: null,
+      usernames: [],
+      names: [],
+    }
+    const breakdown = compareEntities(a, b)
+    const score = computeScore(breakdown)
+    // even a perfect email match on its own should be capped
+    expect(score).toBeLessThanOrEqual(0.6)
+  })
+
+  it('no overlapping fields returns zero', () => {
+    const a: EntityFields = { emails: ['a@b.com'], phones: [], avatarHash: null, usernames: [], names: [] }
+    const b: EntityFields = { emails: [], phones: [], avatarHash: null, usernames: ['someone'], names: [] }
+    const breakdown = compareEntities(a, b)
+    const score = computeScore(breakdown)
+    expect(score).toBe(0)
+  })
 })
