@@ -5,25 +5,31 @@ import neo4j from 'neo4j-driver'
 const seed = process.argv[2]
 
 if (!seed) {
-  console.log('usage: threadr <email>')
+  console.log('usage: threadr <email|domain|username>')
   process.exit(1)
 }
 
 console.log(`\n[*] looking up: ${seed}\n`)
 
-// neo4j
+// neo4j - optional, won't crash if not running
 const driver = neo4j.driver(
-  'bolt://localhost:7687',
-  neo4j.auth.basic('neo4j', 'threadr123')
+  process.env.NEO4J_URL || 'bolt://localhost:7687',
+  neo4j.auth.basic('neo4j', process.env.NEO4J_PASS || 'threadr123')
 )
 
+let graphUp = true
+
 async function storeNode(label: string, key: string, props: Record<string, string>) {
+  if (!graphUp) return
   const session = driver.session()
   try {
     await session.run(
       `MERGE (n:${label} {${key}: $val}) SET n += $props RETURN n`,
       { val: props[key], props }
     )
+  } catch (e) {
+    console.log(`[!] neo4j write failed, disabling: ${(e as Error).message}`)
+    graphUp = false
   } finally {
     await session.close()
   }
@@ -34,6 +40,7 @@ async function storeEdge(
   toLabel: string, toKey: string, toVal: string,
   rel: string
 ) {
+  if (!graphUp) return
   const session = driver.session()
   try {
     await session.run(
@@ -47,7 +54,6 @@ async function storeEdge(
   }
 }
 
-// github search
 async function ghLookup(email: string) {
   const res = await fetch(
     `https://api.github.com/search/users?q=${encodeURIComponent(email)}+in:email`,
@@ -77,7 +83,6 @@ async function ghLookup(email: string) {
     })
     await storeEdge('Email', 'address', email, 'Username', 'name', user.login, 'USES')
 
-    // grab repos
     const repoRes = await fetch(user.repos_url, {
       headers: { 'User-Agent': 'threadr/0.1' },
     })
@@ -92,9 +97,8 @@ async function ghLookup(email: string) {
   }
 }
 
-// crt.sh cert transparency
 async function crtsh(domain: string) {
-  console.log(`[*] crt.sh lookup: ${domain}`)
+  console.log(`[*] crt.sh: ${domain}`)
   const res = await fetch(`https://crt.sh/?q=%25.${domain}&output=json`)
 
   if (!res.ok) {
@@ -110,7 +114,7 @@ async function crtsh(domain: string) {
   }
 
   const subs = [...names].filter(n => n !== domain && !n.startsWith('*'))
-  console.log(`[+] found ${subs.length} subdomains`)
+  console.log(`[+] ${subs.length} subdomains`)
   for (const s of subs.slice(0, 20)) {
     console.log(`    ${s}`)
     await storeNode('Domain', 'name', { name: s })
@@ -119,7 +123,7 @@ async function crtsh(domain: string) {
   return subs
 }
 
-async function resolve(subdomains: string[]) {
+async function resolveSubs(subdomains: string[]) {
   console.log(`\n[*] resolving ${subdomains.length} subdomains`)
   for (const sub of subdomains.slice(0, 15)) {
     try {
@@ -130,17 +134,38 @@ async function resolve(subdomains: string[]) {
         await storeEdge('Domain', 'name', sub, 'IP', 'address', ip, 'RESOLVES_TO')
       }
     } catch {
-      // nxdomain or timeout, skip
+      // nxdomain, skip
     }
   }
 }
 
+async function dnsRecords(domain: string) {
+  console.log(`\n[*] dns records: ${domain}`)
+  try {
+    const mx = await dns.resolveMx(domain)
+    for (const m of mx) {
+      console.log(`[+] MX: ${m.exchange} (pri ${m.priority})`)
+      await storeNode('Domain', 'name', { name: m.exchange })
+      await storeEdge('Domain', 'name', domain, 'Domain', 'name', m.exchange, 'HAS_MX')
+    }
+  } catch { /* no mx */ }
+
+  try {
+    const txt = await dns.resolveTxt(domain)
+    for (const t of txt) {
+      const val = t.join('')
+      if (val.includes('v=spf') || val.includes('google') || val.includes('microsoft')) {
+        console.log(`[+] TXT: ${val.slice(0, 80)}`)
+      }
+    }
+  } catch { /* no txt */ }
+}
+
 async function gravatar(email: string) {
   const hash = crypto.createHash('md5').update(email.trim().toLowerCase()).digest('hex')
-  const url = `https://gravatar.com/${hash}.json`
-  console.log(`\n[*] gravatar: ${hash}`)
+  console.log(`[*] gravatar: ${hash}`)
 
-  const res = await fetch(url)
+  const res = await fetch(`https://gravatar.com/${hash}.json`)
   if (res.status === 404) {
     console.log('[-] gravatar: no profile')
     return
@@ -165,13 +190,7 @@ async function gravatar(email: string) {
 }
 
 async function main() {
-  // store seed node first
-  try {
-    await storeNode('Email', 'address', { address: seed })
-  } catch (e) {
-    console.log(`[!] neo4j not running, skipping graph storage: ${e}`)
-    // still run lookups even without neo4j
-  }
+  await storeNode('Email', 'address', { address: seed })
 
   if (seed.includes('@')) {
     const domain = seed.split('@')[1]
@@ -187,9 +206,10 @@ async function main() {
 
   const domain = seed.includes('@') ? seed.split('@')[1] : null
   if (domain) {
+    await dnsRecords(domain)
     const subs = await crtsh(domain)
     if (subs.length) {
-      await resolve(subs)
+      await resolveSubs(subs)
     }
   }
 
