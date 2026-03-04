@@ -58,6 +58,7 @@ function parseGraphResult(res: neo4j.QueryResult) {
     from: r.startNodeElementId,
     to: r.endNodeElementId,
     type: r.type,
+    ...r.properties,
   }))
 
   return { nodes, edges }

@@ -25,6 +25,8 @@ interface Edge {
   from: string
   to: string
   type: string
+  confidence?: number
+  auto?: boolean
 }
 
 interface Props {
@@ -51,6 +53,8 @@ export function Graph({ nodes, edges, onNodeClick, onNodeRightClick, width, heig
       source: e.from,
       target: e.to,
       type: e.type,
+      confidence: e.confidence,
+      _isProbably: e.type === 'PROBABLY_IS',
     })),
   }
 
@@ -82,8 +86,9 @@ export function Graph({ nodes, edges, onNodeClick, onNodeRightClick, width, heig
         ctx.fillStyle = color
         ctx.fill()
       }}
-      linkColor={() => '#333'}
-      linkWidth={0.5}
+      linkColor={(link: any) => link._isProbably ? `rgba(168, 85, 247, ${link.confidence || 0.5})` : '#333'}
+      linkWidth={(link: any) => link._isProbably ? (link.confidence || 0.5) * 3 : 0.5}
+      linkLineDash={(link: any) => link._isProbably ? [4, 2] : null}
       linkDirectionalArrowLength={3}
       linkDirectionalArrowRelPos={1}
       linkLabel={(link: any) => link.type}
