@@ -1,5 +1,6 @@
 import type { Plugin, SeedNode, NodeType, KeyRing } from '@threadr/shared'
 import { storeNode, storeEdge } from './graph.js'
+import { resolve } from './resolver.js'
 
 const plugins: Plugin[] = []
 
@@ -59,6 +60,9 @@ export async function runPlugins(seeds: SeedNode[], keys: KeyRing) {
     console.log(`[*] expanding ${secondary.length} discovered nodes`)
     await runBatch(secondary)
   }
+
+  // entity resolution after all plugins ran
+  await resolve()
 
   return { nodes, edges }
 }
