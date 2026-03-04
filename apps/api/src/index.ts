@@ -4,7 +4,7 @@ import { cors } from 'hono/cors'
 import { Queue } from 'bullmq'
 import { randomUUID } from 'node:crypto'
 import { db } from './db.js'
-import { getGraph } from './graph.js'
+import { getGraph, getMerges, confirmMerge, rejectMerge } from './graph.js'
 
 const scanQueue = new Queue('scans', {
   connection: { host: process.env.REDIS_HOST || 'localhost', port: 6379 },
@@ -66,6 +66,28 @@ app.post('/scan/:id/expand', async (c) => {
   await scanQueue.add('scan', { id: row.id, seed }, { jobId: `${row.id}-expand-${Date.now()}` })
 
   return c.json({ status: 'expanding', seed })
+})
+
+// --- merge suggestions ---
+
+app.get('/scan/:id/merges', async (c) => {
+  const row = db.prepare('SELECT * FROM scans WHERE id = ?').get(c.req.param('id')) as { seed: string } | undefined
+  if (!row) return c.json({ error: 'scan not found' }, 404)
+  const merges = await getMerges()
+  return c.json(merges)
+})
+
+app.post('/merge', async (c) => {
+  const body = await c.req.json()
+  const { fromId, toId, action } = body
+  if (!fromId || !toId || !action) return c.json({ error: 'fromId, toId, action required' }, 400)
+
+  if (action === 'confirm') {
+    await confirmMerge(fromId, toId)
+  } else {
+    await rejectMerge(fromId, toId)
+  }
+  return c.json({ ok: true })
 })
 
 // --- settings ---

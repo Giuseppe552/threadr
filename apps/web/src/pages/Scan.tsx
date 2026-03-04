@@ -23,6 +23,14 @@ interface ScanData {
   edge_count: number
 }
 
+interface MergeSuggestion {
+  fromId: string
+  fromName: string
+  toId: string
+  toName: string
+  confidence: number
+}
+
 export function Scan() {
   const { id } = useParams()
   const [scan, setScan] = useState<ScanData | null>(null)
@@ -30,6 +38,7 @@ export function Scan() {
   const [edges, setEdges] = useState<GraphEdge[]>([])
   const [selected, setSelected] = useState<GraphNode | null>(null)
   const [expanding, setExpanding] = useState(false)
+  const [merges, setMerges] = useState<MergeSuggestion[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
   const [dims, setDims] = useState({ w: 800, h: 600 })
 
@@ -40,6 +49,7 @@ export function Scan() {
       setNodes(data.nodes || [])
       setEdges(data.edges || [])
     })
+    fetch(`/api/scan/${id}/merges`).then(r => r.json()).then(setMerges)
   }, [id])
 
   useEffect(() => {
@@ -145,6 +155,34 @@ export function Scan() {
           </div>
         )}
       </div>
+
+      {merges.length > 0 && (
+        <div className="px-4 py-2 border-t border-border bg-surface">
+          <div className="text-xs text-text-muted uppercase mb-1">merge suggestions</div>
+          {merges.map((m, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs py-0.5">
+              <span className="mono text-mono">{m.fromName}</span>
+              <span className="text-text-muted">≈</span>
+              <span className="mono text-mono">{m.toName}</span>
+              <span className="text-text-muted">({(m.confidence * 100).toFixed(0)}%)</span>
+              <button
+                onClick={async () => {
+                  await fetch('/api/merge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromId: m.fromId, toId: m.toId, action: 'confirm' }) })
+                  setMerges(merges.filter((_, j) => j !== i))
+                }}
+                className="text-green-500 hover:underline ml-auto"
+              >confirm</button>
+              <button
+                onClick={async () => {
+                  await fetch('/api/merge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromId: m.fromId, toId: m.toId, action: 'reject' }) })
+                  setMerges(merges.filter((_, j) => j !== i))
+                }}
+                className="text-red-500 hover:underline"
+              >reject</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-4 px-4 py-1.5 border-t border-border text-xs text-text-muted bg-surface">
         <span>scan: <span className="mono">{scan.seed}</span></span>

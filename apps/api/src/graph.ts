@@ -63,3 +63,55 @@ function parseGraphResult(res: neo4j.QueryResult) {
 
   return { nodes, edges }
 }
+
+export async function getMerges() {
+  const session = driver.session()
+  try {
+    const res = await session.run(`
+      MATCH (a)-[r:PROBABLY_IS]->(b)
+      WHERE r.auto = false
+      RETURN elementId(a) AS fromId, a.name AS fromName, labels(a)[0] AS fromLabel,
+             elementId(b) AS toId, b.name AS toName, labels(b)[0] AS toLabel,
+             r.confidence AS confidence
+    `)
+    return res.records.map(r => ({
+      fromId: r.get('fromId'),
+      fromName: r.get('fromName'),
+      fromLabel: r.get('fromLabel'),
+      toId: r.get('toId'),
+      toName: r.get('toName'),
+      toLabel: r.get('toLabel'),
+      confidence: r.get('confidence'),
+    }))
+  } finally {
+    await session.close()
+  }
+}
+
+export async function confirmMerge(fromId: string, toId: string) {
+  const session = driver.session()
+  try {
+    await session.run(
+      `MATCH (a)-[r:PROBABLY_IS]->(b)
+       WHERE elementId(a) = $fromId AND elementId(b) = $toId
+       SET r.auto = true`,
+      { fromId, toId }
+    )
+  } finally {
+    await session.close()
+  }
+}
+
+export async function rejectMerge(fromId: string, toId: string) {
+  const session = driver.session()
+  try {
+    await session.run(
+      `MATCH (a)-[r:PROBABLY_IS]->(b)
+       WHERE elementId(a) = $fromId AND elementId(b) = $toId
+       DELETE r`,
+      { fromId, toId }
+    )
+  } finally {
+    await session.close()
+  }
+}
