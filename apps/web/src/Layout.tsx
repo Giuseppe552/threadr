@@ -10,7 +10,7 @@ export function Layout() {
           <span className="text-border">|</span>
           <span className="cursor-not-allowed">alerts</span>
           <span className="text-border">|</span>
-          <span className="cursor-not-allowed">settings</span>
+          <Link to="/settings" className="hover:text-text">settings</Link>
         </div>
       </nav>
       <Outlet />
