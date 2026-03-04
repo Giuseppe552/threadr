@@ -2,6 +2,7 @@ import { Worker } from 'bullmq'
 import { runScan } from './scan.js'
 import { db } from './db.js'
 import { loadKeysFromDb } from './keyring.js'
+import { checkDueMonitors } from './monitor.js'
 
 loadKeysFromDb()
 
@@ -34,5 +35,7 @@ const worker = new Worker(
 worker.on('failed', (job, err) => {
   console.log(`[!] job ${job?.id} failed: ${err.message}`)
 })
+
+setInterval(checkDueMonitors, 60_000)
 
 console.log('worker ready')
