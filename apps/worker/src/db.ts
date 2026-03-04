@@ -16,3 +16,28 @@ db.exec(`
     active INTEGER DEFAULT 1
   )
 `)
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS monitors (
+    id TEXT PRIMARY KEY,
+    scan_id TEXT NOT NULL,
+    interval TEXT NOT NULL CHECK(interval IN ('hourly', 'daily', 'weekly')),
+    last_run TEXT,
+    next_run TEXT,
+    active INTEGER DEFAULT 1
+  )
+`)
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS alerts (
+    id TEXT PRIMARY KEY,
+    scan_id TEXT NOT NULL,
+    monitor_id TEXT,
+    type TEXT NOT NULL CHECK(type IN ('breach', 'open_port', 'subdomain', 'repository', 'whois_change', 'social_profile')),
+    severity TEXT NOT NULL CHECK(severity IN ('critical', 'high', 'medium', 'low')),
+    title TEXT NOT NULL,
+    detail TEXT DEFAULT '',
+    seen INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`)
