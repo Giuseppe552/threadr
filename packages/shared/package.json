@@ -13,6 +13,9 @@
   "scripts": {
     "build": "tsc",
     "lint": "tsc --noEmit",
-    "test": "echo 'no tests'"
+    "test": "vitest run --dir src"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
   }
 }
