@@ -26,6 +26,14 @@ export const gitEmails: Plugin = {
       ? repoUrl
       : `https://github.com/${repoUrl}`
 
+    // bail if git isn't installed
+    try {
+      await exec('which', ['git'])
+    } catch {
+      console.log('[!] git-emails: git not installed, skipping')
+      return { nodes, edges }
+    }
+
     let tmp: string | null = null
     try {
       tmp = await mkdtemp(path.join(tmpdir(), 'threadr-git-'))

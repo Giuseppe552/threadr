@@ -1,7 +1,7 @@
 import net from 'node:net'
 import type { Plugin, PluginResult } from '@threadr/shared'
 
-function query(host: string, data: string, timeout = 10_000): Promise<string> {
+function query(host: string, data: string, timeout = 5_000): Promise<string> {
   return new Promise((resolve, reject) => {
     const sock = net.createConnection(43, host)
     let buf = ''
@@ -9,7 +9,7 @@ function query(host: string, data: string, timeout = 10_000): Promise<string> {
     sock.on('connect', () => sock.write(data + '\r\n'))
     sock.on('data', (chunk) => { buf += chunk.toString() })
     sock.on('end', () => resolve(buf))
-    sock.on('timeout', () => { sock.destroy(); reject(new Error(`whois timeout: ${host}`)) })
+    sock.on('timeout', () => { sock.destroy(); reject(new Error(`whois timeout connecting to ${host}`)) })
     sock.on('error', reject)
   })
 }
