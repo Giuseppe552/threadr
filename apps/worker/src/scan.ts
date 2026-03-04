@@ -14,6 +14,7 @@ import { gitEmails } from './plugins/git-emails.js'
 import { whois } from './plugins/whois.js'
 import { virustotal } from './plugins/virustotal.js'
 import { pgp } from './plugins/pgp.js'
+import { hibp } from './plugins/hibp.js'
 
 register(github)
 register(crtsh)
@@ -25,6 +26,7 @@ register(gitEmails)
 register(whois)
 register(virustotal)
 register(pgp)
+register(hibp)
 
 const seedTypeToNode: Record<string, { label: NodeType; key: string }> = {
   email: { label: 'Email', key: 'address' },
