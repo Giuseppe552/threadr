@@ -1,13 +1,16 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
+import { cors } from 'hono/cors'
 import { Queue } from 'bullmq'
 import { randomUUID } from 'node:crypto'
+import { db } from './db.js'
 
 const scanQueue = new Queue('scans', {
   connection: { host: process.env.REDIS_HOST || 'localhost', port: 6379 },
 })
 
 const app = new Hono()
+app.use('*', cors())
 
 app.get('/health', (c) => c.json({ status: 'ok' }))
 
@@ -20,9 +23,26 @@ app.post('/scan', async (c) => {
   }
 
   const id = randomUUID()
+  const type = seed.includes('@') ? 'email' : seed.includes('.') ? 'domain' : 'username'
+
+  db.prepare(
+    'INSERT INTO scans (id, seed, seed_type, status) VALUES (?, ?, ?, ?)'
+  ).run(id, seed, type, 'queued')
+
   await scanQueue.add('scan', { id, seed }, { jobId: id })
 
-  return c.json({ id, seed, status: 'queued' }, 201)
+  return c.json({ id, seed, type, status: 'queued' }, 201)
+})
+
+app.get('/scans', (c) => {
+  const rows = db.prepare('SELECT * FROM scans ORDER BY created_at DESC LIMIT 50').all()
+  return c.json(rows)
+})
+
+app.get('/scan/:id', (c) => {
+  const row = db.prepare('SELECT * FROM scans WHERE id = ?').get(c.req.param('id'))
+  if (!row) return c.json({ error: 'scan not found' }, 404)
+  return c.json(row)
 })
 
 serve({ fetch: app.fetch, port: 3001 }, (info) => {
