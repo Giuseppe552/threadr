@@ -1,0 +1,11 @@
+{
+  "name": "@threadr/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "test": "echo 'no tests'"
+  }
+}
