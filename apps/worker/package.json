@@ -9,7 +9,11 @@
     "test": "echo 'no tests'"
   },
   "dependencies": {
+    "better-sqlite3": "^12.6.2",
     "bullmq": "^5.70.1",
     "neo4j-driver": "^6.0.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13"
   }
 }

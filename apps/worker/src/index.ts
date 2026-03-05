@@ -1,12 +1,25 @@
 import { Worker } from 'bullmq'
 import { runScan } from './scan.js'
+import { db } from './db.js'
 
 const worker = new Worker(
   'scans',
   async (job) => {
     const { id, seed } = job.data
     console.log(`[*] scan ${id}: ${seed}`)
-    await runScan(id, seed)
+
+    db.prepare('UPDATE scans SET status = ? WHERE id = ?').run('running', id)
+
+    try {
+      const stats = await runScan(id, seed)
+      db.prepare(
+        `UPDATE scans SET status = ?, node_count = ?, edge_count = ?, finished_at = datetime('now') WHERE id = ?`
+      ).run('done', stats.nodes, stats.edges, id)
+    } catch (e) {
+      db.prepare('UPDATE scans SET status = ? WHERE id = ?').run('failed', id)
+      throw e
+    }
+
     console.log(`[*] scan ${id}: done`)
   },
   {

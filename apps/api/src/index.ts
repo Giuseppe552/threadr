@@ -4,6 +4,7 @@ import { cors } from 'hono/cors'
 import { Queue } from 'bullmq'
 import { randomUUID } from 'node:crypto'
 import { db } from './db.js'
+import { getGraph } from './graph.js'
 
 const scanQueue = new Queue('scans', {
   connection: { host: process.env.REDIS_HOST || 'localhost', port: 6379 },
@@ -43,6 +44,13 @@ app.get('/scan/:id', (c) => {
   const row = db.prepare('SELECT * FROM scans WHERE id = ?').get(c.req.param('id'))
   if (!row) return c.json({ error: 'scan not found' }, 404)
   return c.json(row)
+})
+
+app.get('/scan/:id/graph', async (c) => {
+  const row = db.prepare('SELECT * FROM scans WHERE id = ?').get(c.req.param('id')) as { seed: string } | undefined
+  if (!row) return c.json({ error: 'scan not found' }, 404)
+  const graph = await getGraph(row.seed)
+  return c.json(graph)
 })
 
 serve({ fetch: app.fetch, port: 3001 }, (info) => {
