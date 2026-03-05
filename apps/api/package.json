@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",
+    "bullmq": "^5.70.1",
     "hono": "^4.7.0"
   }
 }
