@@ -53,6 +53,21 @@ app.get('/scan/:id/graph', async (c) => {
   return c.json(graph)
 })
 
+// expand a specific node — re-run lookups from that node as seed
+app.post('/scan/:id/expand', async (c) => {
+  const row = db.prepare('SELECT * FROM scans WHERE id = ?').get(c.req.param('id')) as { id: string } | undefined
+  if (!row) return c.json({ error: 'scan not found' }, 404)
+
+  const body = await c.req.json()
+  const { seed } = body
+  if (!seed) return c.json({ error: 'seed required' }, 400)
+
+  // queue expansion as a job tied to the same scan
+  await scanQueue.add('scan', { id: row.id, seed }, { jobId: `${row.id}-expand-${Date.now()}` })
+
+  return c.json({ status: 'expanding', seed })
+})
+
 serve({ fetch: app.fetch, port: 3001 }, (info) => {
   console.log(`api running on :${info.port}`)
 })
