@@ -44,38 +44,6 @@ export async function storeEdge(
   }
 }
 
-// get all nodes+edges for a scan's seed
-export async function getGraph(seedLabel: string, seedKey: string, seedVal: string) {
-  const session = driver.session()
-  try {
-    const res = await session.run(
-      `MATCH (root:${seedLabel} {${seedKey}: $val})-[r*0..3]-(n)
-       RETURN DISTINCT n, labels(n) as labels, properties(n) as props`,
-      { val: seedVal }
-    )
-    const nodes = res.records.map((r) => ({
-      id: r.get('n').elementId,
-      label: r.get('labels')[0],
-      props: r.get('props'),
-    }))
-
-    const edgeRes = await session.run(
-      `MATCH (root:${seedLabel} {${seedKey}: $val})-[*0..2]-(a)-[r]-(b)
-       RETURN DISTINCT type(r) as type, a.${seedKey} as from_key, elementId(a) as from_id, elementId(b) as to_id`,
-      { val: seedVal }
-    )
-    const edges = edgeRes.records.map((r) => ({
-      from: r.get('from_id'),
-      to: r.get('to_id'),
-      type: r.get('type'),
-    }))
-
-    return { nodes, edges }
-  } finally {
-    await session.close()
-  }
-}
-
 export async function close() {
   await driver.close()
 }

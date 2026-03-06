@@ -50,6 +50,7 @@ export async function runScan(_scanId: string, seed: string) {
   return { nodes: nodeCount, edges: edgeCount }
 }
 
+// TODO: need to handle rate limits on these, getting 403s
 async function ghLookup(email: string) {
   const res = await fetch(
     `https://api.github.com/search/users?q=${encodeURIComponent(email)}+in:email`,
