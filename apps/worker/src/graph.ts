@@ -37,6 +37,8 @@ export async function storeEdge(
        MERGE (a)-[:${rel}]->(b)`,
       { fv: fromVal, tv: toVal }
     )
+  } catch (e) {
+    console.log(`[!] edge write failed: ${(e as Error).message}`)
   } finally {
     await session.close()
   }
