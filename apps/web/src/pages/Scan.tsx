@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
+import { Graph } from '../Graph.tsx'
 
 interface GraphNode {
   id: string
@@ -27,6 +28,9 @@ export function Scan() {
   const [scan, setScan] = useState<ScanData | null>(null)
   const [nodes, setNodes] = useState<GraphNode[]>([])
   const [edges, setEdges] = useState<GraphEdge[]>([])
+  const [selected, setSelected] = useState<GraphNode | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [dims, setDims] = useState({ w: 800, h: 600 })
 
   useEffect(() => {
     if (!id) return
@@ -37,41 +41,86 @@ export function Scan() {
     })
   }, [id])
 
+  useEffect(() => {
+    if (!containerRef.current) return
+    const obs = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect
+      setDims({ w: width, h: height })
+    })
+    obs.observe(containerRef.current)
+    return () => obs.disconnect()
+  }, [])
+
   if (!scan) return <div className="p-4 text-text-muted text-sm">loading...</div>
 
   return (
-    <div className="p-4">
-      <div className="mb-4 text-xs text-text-muted border-b border-border pb-2 flex gap-4">
-        <span>scan: <span className="mono text-mono">{scan.seed}</span></span>
-        <span>{scan.status}</span>
+    <div className="flex flex-col h-[calc(100vh-41px)]">
+      <div className="flex flex-1 min-h-0">
+        <div ref={containerRef} className="flex-1 min-w-0">
+          <Graph
+            nodes={nodes}
+            edges={edges}
+            width={dims.w}
+            height={dims.h}
+            onNodeClick={setSelected}
+          />
+        </div>
+
+        {selected && (
+          <div className="w-72 border-l border-border p-3 overflow-y-auto">
+            <div className="flex justify-between items-start mb-3">
+              <div className="text-xs text-text-muted uppercase">{selected.label}</div>
+              <button
+                onClick={() => setSelected(null)}
+                className="text-text-muted hover:text-text text-xs"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mono text-sm text-mono mb-3">
+              {selected.props.address || selected.props.name || selected.id}
+            </div>
+            <div className="space-y-1.5">
+              {Object.entries(selected.props).map(([k, v]) => (
+                <div key={k} className="text-xs">
+                  <span className="text-text-muted">{k}: </span>
+                  <span className="mono text-mono">{v}</span>
+                </div>
+              ))}
+            </div>
+
+            {edges.filter(e => e.from === selected.id || e.to === selected.id).length > 0 && (
+              <div className="mt-4">
+                <div className="text-xs text-text-muted uppercase mb-1">
+                  connections ({edges.filter(e => e.from === selected.id || e.to === selected.id).length})
+                </div>
+                {edges
+                  .filter(e => e.from === selected.id || e.to === selected.id)
+                  .map((e, i) => {
+                    const otherId = e.from === selected.id ? e.to : e.from
+                    const other = nodes.find(n => n.id === otherId)
+                    return (
+                      <div
+                        key={i}
+                        className="text-xs py-0.5 cursor-pointer hover:text-text text-text-muted"
+                        onClick={() => other && setSelected(other)}
+                      >
+                        {e.type} → {other?.props.address || other?.props.name || otherId}
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-4 px-4 py-1.5 border-t border-border text-xs text-text-muted bg-surface">
+        <span>scan: <span className="mono">{scan.seed}</span></span>
         <span>{nodes.length} nodes</span>
         <span>{edges.length} edges</span>
+        <span>{scan.status}</span>
       </div>
-
-      <div className="text-xs text-text-muted uppercase tracking-wider mb-2">nodes</div>
-      <div className="space-y-1">
-        {nodes.map(n => (
-          <div key={n.id} className="text-sm flex gap-2">
-            <span className="text-text-muted w-20">{n.label}</span>
-            <span className="mono text-mono">
-              {n.props.address || n.props.name || n.props.url || JSON.stringify(n.props)}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {edges.length > 0 && (
-        <>
-          <div className="text-xs text-text-muted uppercase tracking-wider mb-2 mt-4">edges</div>
-          <div className="space-y-1">
-            {edges.map((e, i) => (
-              <div key={i} className="text-sm mono text-text-muted">
-                {e.type}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
     </div>
   )
 }
