@@ -31,11 +31,12 @@ interface Props {
   nodes: Node[]
   edges: Edge[]
   onNodeClick?: (node: Node) => void
+  onNodeRightClick?: (node: Node) => void
   width: number
   height: number
 }
 
-export function Graph({ nodes, edges, onNodeClick, width, height }: Props) {
+export function Graph({ nodes, edges, onNodeClick, onNodeRightClick, width, height }: Props) {
   const fgRef = useRef<any>(null)
 
   const graphData = {
@@ -84,6 +85,10 @@ export function Graph({ nodes, edges, onNodeClick, width, height }: Props) {
       linkColor={() => '#333'}
       linkWidth={0.5}
       onNodeClick={(node: any) => onNodeClick?.(node._raw)}
+      onNodeRightClick={(node: any, event: MouseEvent) => {
+        event.preventDefault()
+        onNodeRightClick?.(node._raw)
+      }}
       cooldownTicks={100}
       d3AlphaDecay={0.02}
     />

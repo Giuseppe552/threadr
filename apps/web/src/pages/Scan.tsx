@@ -29,6 +29,7 @@ export function Scan() {
   const [nodes, setNodes] = useState<GraphNode[]>([])
   const [edges, setEdges] = useState<GraphEdge[]>([])
   const [selected, setSelected] = useState<GraphNode | null>(null)
+  const [expanding, setExpanding] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const [dims, setDims] = useState({ w: 800, h: 600 })
 
@@ -51,6 +52,25 @@ export function Scan() {
     return () => obs.disconnect()
   }, [])
 
+  async function expandNode(node: GraphNode) {
+    if (!id) return
+    const seed = node.props.address || node.props.name
+    if (!seed) return
+    setExpanding(true)
+    await fetch(`/api/scan/${id}/expand`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seed }),
+    })
+    // poll for updates after a sec
+    setTimeout(async () => {
+      const data = await fetch(`/api/scan/${id}/graph`).then(r => r.json())
+      setNodes(data.nodes || [])
+      setEdges(data.edges || [])
+      setExpanding(false)
+    }, 3000)
+  }
+
   if (!scan) return <div className="p-4 text-text-muted text-sm">loading...</div>
 
   return (
@@ -63,6 +83,7 @@ export function Scan() {
             width={dims.w}
             height={dims.h}
             onNodeClick={setSelected}
+            onNodeRightClick={expandNode}
           />
         </div>
 
@@ -87,6 +108,16 @@ export function Scan() {
                   <span className="mono text-mono">{v}</span>
                 </div>
               ))}
+            </div>
+
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => expandNode(selected)}
+                disabled={expanding}
+                className="text-xs px-2 py-0.5 border border-border hover:border-text-muted rounded-sm disabled:opacity-50"
+              >
+                {expanding ? '...' : 'expand'}
+              </button>
             </div>
 
             {edges.filter(e => e.from === selected.id || e.to === selected.id).length > 0 && (
