@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
     ports:
       - '80:80'
     depends_on:
@@ -12,6 +13,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
     environment:
       NEO4J_URL: bolt://neo4j:7687
       NEO4J_PASS: threadr123
@@ -20,13 +22,16 @@ services:
     volumes:
       - sqlite_data:/data
     depends_on:
-      - neo4j
-      - redis
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   worker:
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
     environment:
       NEO4J_URL: bolt://neo4j:7687
       NEO4J_PASS: threadr123
@@ -35,11 +40,14 @@ services:
     volumes:
       - sqlite_data:/data
     depends_on:
-      - neo4j
-      - redis
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   neo4j:
     image: neo4j:5-community
+    restart: unless-stopped
     ports:
       - '7474:7474'
       - '7687:7687'
@@ -47,11 +55,21 @@ services:
       NEO4J_AUTH: neo4j/threadr123
     volumes:
       - neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "threadr123", "RETURN 1"]
+      interval: 10s
+      retries: 10
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - '6379:6379'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 3
 
 volumes:
   neo4j_data:
