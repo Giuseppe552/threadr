@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useMemo } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 
 const NODE_COLORS: Record<string, string> = {
@@ -32,14 +32,24 @@ interface Edge {
 interface Props {
   nodes: Node[]
   edges: Edge[]
+  selectedId?: string
   onNodeClick?: (node: Node) => void
   onNodeRightClick?: (node: Node) => void
   width: number
   height: number
 }
 
-export function Graph({ nodes, edges, onNodeClick, onNodeRightClick, width, height }: Props) {
+export function Graph({ nodes, edges, selectedId, onNodeClick, onNodeRightClick, width, height }: Props) {
   const fgRef = useRef<any>(null)
+
+  const degree = useMemo(() => {
+    const d: Record<string, number> = {}
+    for (const e of edges) {
+      d[e.from] = (d[e.from] || 0) + 1
+      d[e.to] = (d[e.to] || 0) + 1
+    }
+    return d
+  }, [edges])
 
   const graphData = {
     nodes: nodes.map(n => ({
@@ -48,6 +58,7 @@ export function Graph({ nodes, edges, onNodeClick, onNodeRightClick, width, heig
       name: n.props.address || n.props.name || n.id,
       color: NODE_COLORS[n.label] || '#666',
       _raw: n,
+      _deg: degree[n.id] || 0,
     })),
     links: edges.map(e => ({
       source: e.from,
@@ -59,18 +70,30 @@ export function Graph({ nodes, edges, onNodeClick, onNodeRightClick, width, heig
   }
 
   const paintNode = useCallback((node: any, ctx: CanvasRenderingContext2D) => {
-    const size = 4
+    const size = Math.max(4, Math.min(14, 3 + node._deg * 1.5))
+
+    // selection ring
+    if (selectedId && node.id === selectedId) {
+      ctx.beginPath()
+      ctx.arc(node.x, node.y, size + 3, 0, 2 * Math.PI)
+      ctx.strokeStyle = node.color
+      ctx.lineWidth = 2
+      ctx.globalAlpha = 0.35
+      ctx.stroke()
+      ctx.globalAlpha = 1
+    }
+
     ctx.beginPath()
     ctx.arc(node.x, node.y, size, 0, 2 * Math.PI)
     ctx.fillStyle = node.color
     ctx.fill()
 
-    // label
-    ctx.font = '3px sans-serif'
-    ctx.fillStyle = '#999'
+    const fontSize = Math.max(10, size)
+    ctx.font = `${fontSize}px 'JetBrains Mono', monospace`
+    ctx.fillStyle = '#ccc'
     ctx.textAlign = 'center'
-    ctx.fillText(node.name.slice(0, 24), node.x, node.y + size + 4)
-  }, [])
+    ctx.fillText(node.name.slice(0, 18), node.x, node.y + size + fontSize + 1)
+  }, [selectedId])
 
   return (
     <ForceGraph2D
@@ -81,11 +104,13 @@ export function Graph({ nodes, edges, onNodeClick, onNodeRightClick, width, heig
       backgroundColor="#0a0a0a"
       nodeCanvasObject={paintNode}
       nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
+        const size = Math.max(6, Math.min(16, 5 + (node._deg || 0) * 1.5))
         ctx.beginPath()
-        ctx.arc(node.x, node.y, 6, 0, 2 * Math.PI)
+        ctx.arc(node.x, node.y, size, 0, 2 * Math.PI)
         ctx.fillStyle = color
         ctx.fill()
       }}
+      nodeLabel={(node: any) => `${node.label}: ${node.name}`}
       linkColor={(link: any) => link._isProbably ? `rgba(168, 85, 247, ${link.confidence || 0.5})` : '#333'}
       linkWidth={(link: any) => link._isProbably ? (link.confidence || 0.5) * 3 : 0.5}
       linkLineDash={(link: any) => link._isProbably ? [4, 2] : null}

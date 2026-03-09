@@ -90,6 +90,7 @@ export function Scan() {
           <Graph
             nodes={nodes}
             edges={edges}
+            selectedId={selected?.id}
             width={dims.w}
             height={dims.h}
             onNodeClick={setSelected}
