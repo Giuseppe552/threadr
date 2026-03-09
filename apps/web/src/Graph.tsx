@@ -111,10 +111,19 @@ export function Graph({ nodes, edges, selectedId, onNodeClick, onNodeRightClick,
         ctx.fill()
       }}
       nodeLabel={(node: any) => `${node.label}: ${node.name}`}
-      linkColor={(link: any) => link._isProbably ? `rgba(168, 85, 247, ${link.confidence || 0.5})` : '#333'}
-      linkWidth={(link: any) => link._isProbably ? (link.confidence || 0.5) * 3 : 0.5}
+      linkColor={(link: any) => {
+        if (link._isProbably) return `rgba(168, 85, 247, ${link.confidence || 0.5})`
+        if (link.type === 'EXPOSED_IN') return '#ef4444'
+        if (link.type === 'OPEN_PORT') return '#f59e0b'
+        return '#555'
+      }}
+      linkWidth={(link: any) => {
+        if (link._isProbably) return (link.confidence || 0.5) * 3
+        if (link.type === 'EXPOSED_IN') return 1.5
+        return 0.8
+      }}
       linkLineDash={(link: any) => link._isProbably ? [4, 2] : null}
-      linkDirectionalArrowLength={3}
+      linkDirectionalArrowLength={4}
       linkDirectionalArrowRelPos={1}
       linkLabel={(link: any) => link.type}
       onNodeClick={(node: any) => onNodeClick?.(node._raw)}
