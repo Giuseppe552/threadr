@@ -15,7 +15,7 @@ services:
     environment:
       NEO4J_URL: bolt://neo4j:7687
       NEO4J_PASS: threadr123
-      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
       DB_PATH: /data/threadr.db
     volumes:
       - sqlite_data:/data
@@ -30,7 +30,7 @@ services:
     environment:
       NEO4J_URL: bolt://neo4j:7687
       NEO4J_PASS: threadr123
-      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
       DB_PATH: /data/threadr.db
     volumes:
       - sqlite_data:/data
