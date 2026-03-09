@@ -21,12 +21,12 @@ export function Settings() {
   const [label, setLabel] = useState('')
 
   useEffect(() => {
-    fetch('/api/settings/plugins').then(r => r.json()).then(setPlugins)
+    fetch('/api/settings/plugins').then(r => r.json()).then(setPlugins).catch(() => {})
     fetchKeys()
   }, [])
 
   function fetchKeys() {
-    fetch('/api/settings/keys').then(r => r.json()).then(setKeys)
+    fetch('/api/settings/keys').then(r => r.json()).then(setKeys).catch(() => {})
   }
 
   async function addKey(e: React.FormEvent) {

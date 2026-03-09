@@ -35,12 +35,12 @@ export function Alerts() {
 
   useEffect(() => {
     fetchAlerts()
-    fetch('/api/monitors').then(r => r.json()).then(setMonitors)
+    fetch('/api/monitors').then(r => r.json()).then(setMonitors).catch(() => {})
   }, [])
 
   function fetchAlerts() {
     const url = filter ? `/api/alerts?severity=${filter}` : '/api/alerts'
-    fetch(url).then(r => r.json()).then(setAlerts)
+    fetch(url).then(r => r.json()).then(setAlerts).catch(() => {})
   }
 
   async function markSeen(id: string) {

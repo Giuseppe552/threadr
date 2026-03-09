@@ -16,12 +16,14 @@ export function Dashboard() {
   const [scans, setScans] = useState<ScanRow[]>([])
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
+  const [error, setError] = useState('')
   const nav = useNavigate()
 
   useEffect(() => {
     fetch('/api/scans')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
       .then(setScans)
+      .catch(() => {})
       .finally(() => setFetching(false))
   }, [])
 
@@ -29,14 +31,24 @@ export function Dashboard() {
     e.preventDefault()
     if (!seed.trim()) return
     setLoading(true)
-    const res = await fetch('/api/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seed: seed.trim() }),
-    })
-    const data = await res.json()
-    setLoading(false)
-    nav(`/scan/${data.id}`)
+    setError('')
+    try {
+      const res = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seed: seed.trim() }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || res.statusText)
+      }
+      const data = await res.json()
+      nav(`/scan/${data.id}`)
+    } catch (err) {
+      setError((err as Error).message || 'scan failed')
+    } finally {
+      setLoading(false)
+    }
   }
 
   function timeAgo(ts: string) {
@@ -56,7 +68,7 @@ export function Dashboard() {
           type="text"
           value={seed}
           onChange={e => setSeed(e.target.value)}
-          placeholder="email, domain, or username"
+          placeholder="try: torvalds@linux-foundation.org"
           className="flex-1 bg-surface border border-border px-3 py-1.5 text-sm mono text-mono rounded-sm focus:outline-none focus:border-text-muted"
         />
         <button
@@ -67,12 +79,13 @@ export function Dashboard() {
           {loading ? '...' : 'scan'}
         </button>
       </form>
+      {error && <div className="text-red-500 text-xs mb-4 -mt-4">{error}</div>}
 
       <div className="text-xs text-text-muted uppercase tracking-wider mb-2">recent scans</div>
       {fetching ? (
         <div className="text-sm text-text-muted">loading...</div>
       ) : scans.length === 0 ? (
-        <div className="text-sm text-text-muted">No scans yet.</div>
+        <div className="text-sm text-text-muted">no scans yet — enter an email, domain, or username above</div>
       ) : (
         <table className="w-full text-sm">
           <thead>
