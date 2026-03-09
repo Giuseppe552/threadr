@@ -1,6 +1,7 @@
 import dns from 'node:dns/promises'
 import crypto from 'node:crypto'
 import { storeNode, storeEdge } from './graph.js'
+import { checkSocial } from './social.js'
 
 let nodeCount = 0
 let edgeCount = 0
@@ -32,7 +33,12 @@ export async function runScan(_scanId: string, seed: string) {
     await trackEdge('Email', 'address', seed, 'Domain', 'name', domain, 'OWNS')
   }
 
-  await ghLookup(seed)
+  const ghUsers = await ghLookup(seed)
+
+  // check social profiles for discovered usernames
+  for (const u of ghUsers) {
+    await checkSocial(u)
+  }
 
   if (seed.includes('@')) {
     await gravatar(seed)
@@ -51,7 +57,7 @@ export async function runScan(_scanId: string, seed: string) {
 }
 
 // TODO: need to handle rate limits on these, getting 403s
-async function ghLookup(email: string) {
+async function ghLookup(email: string): Promise<string[]> {
   const res = await fetch(
     `https://api.github.com/search/users?q=${encodeURIComponent(email)}+in:email`,
     { headers: { 'User-Agent': 'threadr/0.1' } }
@@ -59,17 +65,20 @@ async function ghLookup(email: string) {
 
   if (!res.ok) {
     console.log(`[!] github: ${res.status}`)
-    return
+    return []
   }
 
   const data = await res.json()
   if (data.total_count === 0) {
     console.log('[-] github: no results')
-    return
+    return []
   }
+
+  const usernames: string[] = []
 
   for (const user of data.items) {
     console.log(`[+] github: ${user.login}`)
+    usernames.push(user.login)
 
     await trackNode('Username', 'name', {
       name: user.login,
@@ -90,6 +99,8 @@ async function ghLookup(email: string) {
       }
     }
   }
+
+  return usernames
 }
 
 async function crtsh(domain: string) {
