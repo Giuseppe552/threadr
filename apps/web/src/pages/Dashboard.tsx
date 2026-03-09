@@ -15,10 +15,14 @@ export function Dashboard() {
   const [seed, setSeed] = useState('')
   const [scans, setScans] = useState<ScanRow[]>([])
   const [loading, setLoading] = useState(false)
+  const [fetching, setFetching] = useState(true)
   const nav = useNavigate()
 
   useEffect(() => {
-    fetch('/api/scans').then(r => r.json()).then(setScans)
+    fetch('/api/scans')
+      .then(r => r.json())
+      .then(setScans)
+      .finally(() => setFetching(false))
   }, [])
 
   async function startScan(e: React.FormEvent) {
@@ -65,7 +69,9 @@ export function Dashboard() {
       </form>
 
       <div className="text-xs text-text-muted uppercase tracking-wider mb-2">recent scans</div>
-      {scans.length === 0 ? (
+      {fetching ? (
+        <div className="text-sm text-text-muted">loading...</div>
+      ) : scans.length === 0 ? (
         <div className="text-sm text-text-muted">No scans yet.</div>
       ) : (
         <table className="w-full text-sm">
