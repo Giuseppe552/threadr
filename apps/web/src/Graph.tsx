@@ -84,6 +84,9 @@ export function Graph({ nodes, edges, onNodeClick, onNodeRightClick, width, heig
       }}
       linkColor={() => '#333'}
       linkWidth={0.5}
+      linkDirectionalArrowLength={3}
+      linkDirectionalArrowRelPos={1}
+      linkLabel={(link: any) => link.type}
       onNodeClick={(node: any) => onNodeClick?.(node._raw)}
       onNodeRightClick={(node: any, event: MouseEvent) => {
         event.preventDefault()
