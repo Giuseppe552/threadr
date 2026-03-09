@@ -139,6 +139,7 @@ app.get('/settings/plugins', (c) => {
     { id: 'whois', name: 'WHOIS', requiresKey: false },
     { id: 'virustotal', name: 'VirusTotal', requiresKey: true },
     { id: 'pgp', name: 'PGP Keyserver', requiresKey: false },
+    { id: 'hibp', name: 'Have I Been Pwned', requiresKey: true },
   ]
   return c.json(plugins)
 })
