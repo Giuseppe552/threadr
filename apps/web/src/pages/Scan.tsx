@@ -31,6 +31,13 @@ interface MergeSuggestion {
   confidence: number
 }
 
+const STATUS_STYLE: Record<string, string> = {
+  queued: 'bg-gray-700 text-gray-300',
+  running: 'bg-amber-900 text-amber-300 animate-pulse',
+  done: 'bg-green-900 text-green-300',
+  failed: 'bg-red-900 text-red-300',
+}
+
 export function Scan() {
   const { id } = useParams()
   const [scan, setScan] = useState<ScanData | null>(null)
@@ -42,15 +49,41 @@ export function Scan() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [dims, setDims] = useState({ w: 800, h: 600 })
 
+  function fetchGraph() {
+    if (!id) return
+    fetch(`/api/scan/${id}/graph`)
+      .then(r => r.json())
+      .then(data => { setNodes(data.nodes || []); setEdges(data.edges || []) })
+      .catch(() => {})
+  }
+
   useEffect(() => {
     if (!id) return
-    fetch(`/api/scan/${id}`).then(r => r.json()).then(setScan)
-    fetch(`/api/scan/${id}/graph`).then(r => r.json()).then(data => {
-      setNodes(data.nodes || [])
-      setEdges(data.edges || [])
-    })
-    fetch(`/api/scan/${id}/merges`).then(r => r.json()).then(setMerges)
+    fetch(`/api/scan/${id}`).then(r => r.json()).then(setScan).catch(() => {})
+    fetchGraph()
+    fetch(`/api/scan/${id}/merges`).then(r => r.json()).then(setMerges).catch(() => {})
   }, [id])
+
+  // poll scan status while running
+  useEffect(() => {
+    if (!id || !scan) return
+    if (scan.status === 'done' || scan.status === 'failed') return
+
+    const iv = setInterval(() => {
+      fetch(`/api/scan/${id}`)
+        .then(r => r.json())
+        .then((s: ScanData) => {
+          setScan(s)
+          if (s.status === 'done' || s.status === 'failed') {
+            fetchGraph()
+            fetch(`/api/scan/${id}/merges`).then(r => r.json()).then(setMerges).catch(() => {})
+          }
+        })
+        .catch(() => {})
+    }, 2000)
+
+    return () => clearInterval(iv)
+  }, [id, scan?.status])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -67,21 +100,32 @@ export function Scan() {
     const seed = node.props.address || node.props.name
     if (!seed) return
     setExpanding(true)
+
     await fetch(`/api/scan/${id}/expand`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ seed }),
-    })
-    // poll for updates after a sec
-    setTimeout(async () => {
-      const data = await fetch(`/api/scan/${id}/graph`).then(r => r.json())
-      setNodes(data.nodes || [])
-      setEdges(data.edges || [])
-      setExpanding(false)
-    }, 3000)
+    }).catch(() => {})
+
+    const prevCount = nodes.length
+    let tries = 0
+    const poll = setInterval(async () => {
+      tries++
+      try {
+        const data = await fetch(`/api/scan/${id}/graph`).then(r => r.json())
+        if ((data.nodes || []).length > prevCount || tries >= 5) {
+          setNodes(data.nodes || [])
+          setEdges(data.edges || [])
+          setExpanding(false)
+          clearInterval(poll)
+        }
+      } catch {
+        if (tries >= 5) { setExpanding(false); clearInterval(poll) }
+      }
+    }, 1500)
   }
 
-  if (!scan) return <div className="p-4 text-text-muted text-sm">loading...</div>
+  if (!scan) return <div className="p-4 text-text-muted text-sm">loading graph...</div>
 
   return (
     <div className="flex flex-col h-[calc(100vh-41px)]">
@@ -189,7 +233,7 @@ export function Scan() {
         <span>scan: <span className="mono">{scan.seed}</span></span>
         <span>{nodes.length} nodes</span>
         <span>{edges.length} edges</span>
-        <span>{scan.status}</span>
+        <span className={`px-1.5 py-0.5 rounded text-[10px] ${STATUS_STYLE[scan.status] || ''}`}>{scan.status}</span>
       </div>
     </div>
   )
