@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "lint": "tsc --noEmit",
     "test": "echo 'no tests'"
