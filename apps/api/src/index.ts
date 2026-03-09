@@ -15,7 +15,21 @@ app.use('*', cors())
 
 app.get('/health', (c) => c.json({ status: 'ok' }))
 
+const scanLimits = new Map<string, { count: number, reset: number }>()
+
 app.post('/scan', async (c) => {
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const now = Date.now()
+  const entry = scanLimits.get(ip)
+  if (entry && entry.reset > now && entry.count >= 10) {
+    return c.json({ error: 'rate limited — try again later' }, 429)
+  }
+  if (!entry || entry.reset <= now) {
+    scanLimits.set(ip, { count: 1, reset: now + 3600_000 })
+  } else {
+    entry.count++
+  }
+
   const body = await c.req.json()
   const { seed } = body
 
