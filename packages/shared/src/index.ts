@@ -44,3 +44,29 @@ export function detectSeedType(seed: string): SeedType {
   if (/^\+?\d[\d\s-]{6,}$/.test(seed)) return 'phone'
   return 'username'
 }
+
+// plugin interface
+export interface SeedNode {
+  type: NodeType
+  key: string
+  value: string
+}
+
+export interface PluginResult {
+  nodes: { label: NodeType; key: string; props: Record<string, string> }[]
+  edges: { fromLabel: NodeType; fromKey: string; fromVal: string; toLabel: NodeType; toKey: string; toVal: string; rel: EdgeType }[]
+}
+
+export interface Plugin {
+  id: string
+  name: string
+  accepts: NodeType[]
+  requiresKey: boolean
+  rateLimit: { requests: number; windowMs: number }
+  run(seed: SeedNode, keys: KeyRing): Promise<PluginResult>
+}
+
+export interface KeyRing {
+  get(pluginId: string): string | null
+  markBurned(pluginId: string, key: string): void
+}
