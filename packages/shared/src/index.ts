@@ -73,3 +73,19 @@ export interface KeyRing {
 
 export { jaro, jaroWinkler, compareEntities, computeScore } from './scoring.js'
 export type { EntityFields, MatchCandidate } from './scoring.js'
+
+export {
+  createMass, combine, fuseAll, FIELD_RELIABILITY,
+  analyzeSpectrum,
+  predictLinks,
+  computeExposure,
+  graphDistance,
+} from './analytics/index.js'
+
+export type {
+  MassFunction, DSResult,
+  AdjacencyInput, SpectralResult,
+  PredictedLink, LinkPredictionResult,
+  ExposureScore,
+  TransportPlan,
+} from './analytics/index.js'
