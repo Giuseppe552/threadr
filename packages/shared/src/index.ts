@@ -75,6 +75,17 @@ export { jaro, jaroWinkler, compareEntities, computeScore } from './scoring.js'
 export type { EntityFields, MatchCandidate } from './scoring.js'
 
 export {
+  fingerprint,
+  generateChallenge,
+  verifySignature,
+  createSessionToken,
+  verifySessionToken,
+  deriveEncryptionKey,
+  encryptData,
+  decryptData,
+} from './crypto/index.js'
+
+export {
   createMass, combine, fuseAll, FIELD_RELIABILITY,
   analyzeSpectrum,
   predictLinks,
