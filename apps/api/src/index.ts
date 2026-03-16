@@ -5,6 +5,7 @@ import { Queue } from 'bullmq'
 import { randomUUID } from 'node:crypto'
 import { db } from './db.js'
 import { getGraph, getMerges, confirmMerge, rejectMerge } from './graph.js'
+import { toGraphML, detectSeedType } from './graphml.js'
 
 const scanQueue = new Queue('scans', {
   connection: { host: process.env.REDIS_HOST || 'localhost', port: 6379 },
@@ -12,6 +13,25 @@ const scanQueue = new Queue('scans', {
 
 const app = new Hono()
 app.use('*', cors())
+
+// Token auth middleware — skip if API_TOKEN is not set (local-only usage)
+const apiToken = process.env.API_TOKEN
+app.use('*', async (c, next) => {
+  // Health check is always public
+  if (c.req.path === '/health') return next()
+  // If no token configured, skip auth (backwards compatible)
+  if (!apiToken) return next()
+
+  const auth = c.req.header('authorization')
+  const bearer = auth?.startsWith('Bearer ') ? auth.slice(7) : null
+  const query = c.req.query('token')
+  const token = bearer || query
+
+  if (!token || token !== apiToken) {
+    return c.json({ error: 'unauthorized' }, 401)
+  }
+  return next()
+})
 
 app.get('/health', (c) => c.json({ status: 'ok' }))
 
@@ -38,7 +58,7 @@ app.post('/scan', async (c) => {
   }
 
   const id = randomUUID()
-  const type = seed.includes('@') ? 'email' : seed.includes('.') ? 'domain' : 'username'
+  const type = detectSeedType(seed)
 
   db.prepare(
     'INSERT INTO scans (id, seed, seed_type, status) VALUES (?, ?, ?, ?)'
@@ -65,6 +85,33 @@ app.get('/scan/:id/graph', async (c) => {
   if (!row) return c.json({ error: 'scan not found' }, 404)
   const graph = await getGraph(row.seed)
   return c.json(graph)
+})
+
+// --- export ---
+
+app.get('/scan/:id/export', async (c) => {
+  const row = db.prepare('SELECT * FROM scans WHERE id = ?').get(c.req.param('id')) as { seed: string; id: string } | undefined
+  if (!row) return c.json({ error: 'scan not found' }, 404)
+
+  const format = c.req.query('format') || 'json'
+  const graph = await getGraph(row.seed)
+
+  if (format === 'graphml') {
+    const xml = toGraphML(graph.nodes, graph.edges)
+    c.header('Content-Type', 'application/xml')
+    c.header('Content-Disposition', `attachment; filename="threadr-${row.id.slice(0, 8)}.graphml"`)
+    return c.body(xml)
+  }
+
+  // Default: JSON
+  c.header('Content-Disposition', `attachment; filename="threadr-${row.id.slice(0, 8)}.json"`)
+  return c.json({
+    scan_id: row.id,
+    seed: row.seed,
+    exported_at: new Date().toISOString(),
+    nodes: graph.nodes,
+    edges: graph.edges,
+  })
 })
 
 // expand a specific node — re-run lookups from that node as seed

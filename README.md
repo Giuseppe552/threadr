@@ -2,6 +2,8 @@
 
 OSINT reconnaissance tool that maps relationships between digital identities. Feed it an email, domain, or username and it builds a graph of connected accounts, infrastructure, and metadata.
 
+Free. Open source. Self-hosted. No cloud, no accounts, no tracking.
+
 ```
                   ┌─────────┐
                   │  web ui │ :80
@@ -30,11 +32,13 @@ OSINT reconnaissance tool that maps relationships between digital identities. Fe
 ## quick start
 
 ```sh
+git clone https://github.com/Giuseppe552/threadr.git
+cd threadr
 docker compose up -d
 open http://localhost
 ```
 
-Needs Docker and Docker Compose. Neo4j, Redis, and SQLite are handled by the compose file.
+Three commands. Neo4j, Redis, and SQLite are handled by the compose file.
 
 ## development
 
@@ -44,6 +48,16 @@ docker compose up neo4j redis -d   # just the databases
 npm run build
 npm run dev                         # starts api + worker + web
 ```
+
+## what it does
+
+Enter an email address. threadr queries 11 data sources simultaneously, discovers linked accounts, infrastructure, and metadata, then builds a force-directed graph of relationships.
+
+Enter a domain. It pulls certificate transparency logs, DNS records, WHOIS data, open ports, and VirusTotal scores. Every subdomain, every MX record, every cert — mapped.
+
+Enter a username. It checks 8 social platforms, finds linked emails, follows the trail across GitHub repos and PGP keyservers.
+
+Everything links together. An email leads to a GitHub account, which leads to commit emails, which lead to domains, which lead to subdomains, which lead to IPs, which lead to open ports. threadr follows the graph.
 
 ## plugins
 
@@ -61,7 +75,9 @@ npm run dev                         # starts api + worker + web
 | pgp | Email | no | HKP keyserver lookup |
 | hibp | Email | yes | breach history from haveibeenpwned |
 
-API keys are managed in the settings page. Plugins that need keys are skipped when no key is configured.
+8 plugins work without any API keys. Add Shodan, VirusTotal, or HIBP keys in the settings page for deeper coverage. Plugins that need keys are skipped when none are configured.
+
+Writing your own plugin takes about 30 lines. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## entity resolution
 
@@ -71,36 +87,40 @@ After plugins run, the resolver compares all `Person` nodes pairwise using Jaro-
 - Score 0.6–0.84 → suggested for manual review
 - Score < 0.3 → ignored
 
-Merge suggestions show up in the scan view.
+This catches cases where the same person appears across multiple platforms with slightly different usernames or display names. Merge suggestions show up in the scan view.
 
 ## monitoring
 
-Create monitors on any scan to re-run it on a schedule (hourly, daily, weekly). The worker takes graph snapshots before and after each re-scan, diffs them, and generates alerts for new nodes/edges.
+Create monitors on any scan to re-run it on a schedule (hourly, daily, weekly). The worker takes graph snapshots before and after each re-scan, diffs them, and generates alerts:
 
-Severity levels:
-- **critical** — breach exposure
+- **critical** — breach exposure detected
 - **high** — new open ports
-- **medium** — new subdomains, cert changes, whois changes
+- **medium** — new subdomains, cert changes, WHOIS changes
 - **low** — new social profiles, usernames
 
-## limitations
-
-- Social profile detection uses HEAD requests — false positives happen (linkedin especially)
-- WHOIS parsing is best-effort since every registrar formats output differently
-- Entity resolution is O(n²) on person nodes — works fine for typical scans but would need optimization for huge datasets
-- crt.sh can be slow or rate limit aggressively
-- No authentication on the web UI — run behind a reverse proxy if exposed
+Set up a monitor on a target, walk away. threadr tells you when something changes.
 
 ## vs other tools
 
 | | threadr | maltego | spiderfoot |
 |---|---|---|---|
-| open source | yes | no | yes |
-| graph ui | yes | yes | table-based |
+| open source | MIT | no | yes (LGPLv3) |
+| graph ui | force-directed | yes | table-based |
 | entity resolution | automatic | manual | no |
 | monitoring/alerts | yes | no | limited |
 | self-hosted | docker compose | desktop app | docker |
-| price | free | expensive | free/paid |
+| price | free | starts at €999/yr | free/paid |
+| plugins | 11 (extensible) | 300+ (marketplace) | 200+ (built-in) |
+
+threadr has fewer data sources than Maltego or SpiderFoot. What it has is automatic entity resolution, continuous monitoring, and a clean graph UI — in a self-hosted package you can run in three commands.
+
+## limitations
+
+- Social profile detection uses HEAD requests — false positives happen (LinkedIn especially)
+- WHOIS parsing is best-effort since every registrar formats output differently
+- Entity resolution is O(n²) on person nodes — fine for typical scans, needs optimization for huge datasets
+- crt.sh can be slow or rate limit aggressively
+- No authentication on the web UI — run behind a reverse proxy if exposing to a network
 
 ## stack
 
@@ -109,4 +129,14 @@ Severity levels:
 - **worker**: BullMQ + Node.js
 - **graph db**: Neo4j
 - **queue**: Redis
-- **metadata**: SQLite (better-sqlite3)
+- **metadata**: SQLite (better-sqlite3, WAL mode)
+
+## support
+
+threadr is free and always will be. No paid tiers, no premium plugins, no limits.
+
+If you find it useful, star the repo or [buy me a coffee](https://giuseppegiona.com).
+
+## license
+
+MIT. See [LICENSE](LICENSE).

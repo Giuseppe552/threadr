@@ -234,6 +234,11 @@ export function Scan() {
         <span>{nodes.length} nodes</span>
         <span>{edges.length} edges</span>
         <span className={`px-1.5 py-0.5 rounded text-[10px] ${STATUS_STYLE[scan.status] || ''}`}>{scan.status}</span>
+        <span className="ml-auto flex gap-2">
+          <a href={`/api/scan/${id}/export?format=json`} download className="hover:text-text">export json</a>
+          <span className="text-border">|</span>
+          <a href={`/api/scan/${id}/export?format=graphml`} download className="hover:text-text">export graphml</a>
+        </span>
       </div>
     </div>
   )
