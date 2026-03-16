@@ -187,6 +187,12 @@ app.get('/settings/plugins', (c) => {
     { id: 'virustotal', name: 'VirusTotal', requiresKey: true },
     { id: 'pgp', name: 'PGP Keyserver', requiresKey: false },
     { id: 'hibp', name: 'Have I Been Pwned', requiresKey: true },
+    { id: 'reverse-dns', name: 'Reverse DNS (PTR)', requiresKey: false },
+    { id: 'reverse-ip', name: 'Reverse IP Lookup', requiresKey: false },
+    { id: 'geoip', name: 'IP Geolocation', requiresKey: false },
+    { id: 'http-fingerprint', name: 'HTTP Fingerprint', requiresKey: false },
+    { id: 'email-validation', name: 'Email Validation', requiresKey: false },
+    { id: 'securitytrails', name: 'SecurityTrails', requiresKey: true },
   ]
   return c.json(plugins)
 })

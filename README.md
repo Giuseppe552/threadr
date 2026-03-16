@@ -51,13 +51,15 @@ npm run dev                         # starts api + worker + web
 
 ## what it does
 
-Enter an email address. threadr queries 11 data sources simultaneously, discovers linked accounts, infrastructure, and metadata, then builds a force-directed graph of relationships.
+Enter an email address. threadr queries 17 data sources simultaneously, discovers linked accounts, infrastructure, and metadata, then builds a force-directed graph of relationships.
 
-Enter a domain. It pulls certificate transparency logs, DNS records, WHOIS data, open ports, and VirusTotal scores. Every subdomain, every MX record, every cert — mapped.
+Enter a domain. It pulls certificate transparency logs, full DNS enumeration (A/AAAA/MX/NS/TXT/SOA/CNAME), WHOIS data, HTTP fingerprinting, open ports, historical DNS records, and associated domains. Every subdomain, every nameserver, every SPF include — mapped.
 
 Enter a username. It checks 8 social platforms, finds linked emails, follows the trail across GitHub repos and PGP keyservers.
 
-Everything links together. An email leads to a GitHub account, which leads to commit emails, which lead to domains, which lead to subdomains, which lead to IPs, which lead to open ports. threadr follows the graph.
+Enter an IP. It does reverse DNS, reverse IP (all domains on that IP), geolocation (country/city/ASN/ISP), and port scanning.
+
+Everything links together. An email leads to a GitHub account, which leads to commit emails, which lead to domains, which lead to subdomains, which lead to IPs, which lead to other domains sharing that IP. threadr follows the graph.
 
 ## plugins
 
@@ -65,7 +67,7 @@ Everything links together. An email leads to a GitHub account, which leads to co
 |--------|-------|---------|-------------|
 | github | Email | no | finds github accounts, grabs repos |
 | crt.sh | Domain | no | certificate transparency → subdomains |
-| dns | Domain | no | MX + TXT records |
+| dns | Domain | no | full enumeration: A/AAAA/MX/NS/TXT/SOA/CNAME, SPF parsing, SOA hostmaster extraction |
 | gravatar | Email | no | profile lookup via md5 hash |
 | social | Username | no | HEAD checks across 8 platforms |
 | shodan | IP, Domain | yes | open ports, banners, org info |
@@ -74,8 +76,14 @@ Everything links together. An email leads to a GitHub account, which leads to co
 | virustotal | Domain, IP | yes | malicious score from VT community |
 | pgp | Email | no | HKP keyserver lookup |
 | hibp | Email | yes | breach history from haveibeenpwned |
+| reverse-dns | IP | no | PTR record lookup — hostname from IP |
+| reverse-ip | IP | no | all domains hosted on the same IP |
+| geoip | IP | no | country, city, ISP, ASN, coordinates |
+| http-fingerprint | Domain | no | web server, framework, CDN, CMS, security headers |
+| email-validation | Email | no | MX check + SMTP RCPT TO probe + catch-all detection |
+| securitytrails | Domain, IP | yes | passive DNS history, subdomains, associated domains |
 
-8 plugins work without any API keys. Add Shodan, VirusTotal, or HIBP keys in the settings page for deeper coverage. Plugins that need keys are skipped when none are configured.
+13 plugins work without any API keys. Add Shodan, VirusTotal, HIBP, or SecurityTrails keys in the settings page for deeper coverage. Plugins that need keys are skipped when none are configured.
 
 Writing your own plugin takes about 30 lines. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -110,7 +118,7 @@ Set up a monitor on a target, walk away. threadr tells you when something change
 | monitoring/alerts | yes | no | limited |
 | self-hosted | docker compose | desktop app | docker |
 | price | free | starts at €999/yr | free/paid |
-| plugins | 11 (extensible) | 300+ (marketplace) | 200+ (built-in) |
+| plugins | 17 (extensible) | 300+ (marketplace) | 200+ (built-in) |
 
 threadr has fewer data sources than Maltego or SpiderFoot. What it has is automatic entity resolution, continuous monitoring, and a clean graph UI — in a self-hosted package you can run in three commands.
 

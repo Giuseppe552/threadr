@@ -15,6 +15,12 @@ import { whois } from './plugins/whois.js'
 import { virustotal } from './plugins/virustotal.js'
 import { pgp } from './plugins/pgp.js'
 import { hibp } from './plugins/hibp.js'
+import { reverseDns } from './plugins/reverse-dns.js'
+import { reverseIp } from './plugins/reverse-ip.js'
+import { geoip } from './plugins/geoip.js'
+import { httpFingerprint } from './plugins/http-fingerprint.js'
+import { emailValidation } from './plugins/email-validation.js'
+import { securityTrails } from './plugins/security-trails.js'
 
 register(github)
 register(crtsh)
@@ -27,6 +33,12 @@ register(whois)
 register(virustotal)
 register(pgp)
 register(hibp)
+register(reverseDns)
+register(reverseIp)
+register(geoip)
+register(httpFingerprint)
+register(emailValidation)
+register(securityTrails)
 
 const seedTypeToNode: Record<string, { label: NodeType; key: string }> = {
   email: { label: 'Email', key: 'address' },
