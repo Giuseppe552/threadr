@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { Graph } from '../Graph.tsx'
 
@@ -31,13 +31,6 @@ interface MergeSuggestion {
   confidence: number
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  queued: 'bg-gray-700 text-gray-300',
-  running: 'bg-amber-900 text-amber-300 animate-pulse',
-  done: 'bg-green-900 text-green-300',
-  failed: 'bg-red-900 text-red-300',
-}
-
 export function Scan() {
   const { id } = useParams()
   const [scan, setScan] = useState<ScanData | null>(null)
@@ -64,7 +57,6 @@ export function Scan() {
     fetch(`/api/scan/${id}/merges`).then(r => r.json()).then(setMerges).catch(() => {})
   }, [id])
 
-  // poll scan status while running
   useEffect(() => {
     if (!id || !scan) return
     if (scan.status === 'done' || scan.status === 'failed') return
@@ -125,12 +117,22 @@ export function Scan() {
     }, 1500)
   }
 
-  if (!scan) return <div className="p-4 text-text-muted text-sm">loading graph...</div>
+  if (!scan) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-49px)]">
+        <div className="text-center">
+          <div className="inline-block w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin mb-3" />
+          <div className="section-label">loading scan</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-41px)]">
+    <div className="flex flex-col h-[calc(100vh-49px)]">
       <div className="flex flex-1 min-h-0">
-        <div ref={containerRef} className="flex-1 min-w-0">
+        {/* Graph canvas */}
+        <div ref={containerRef} className="flex-1 min-w-0 relative">
           <Graph
             nodes={nodes}
             edges={edges}
@@ -140,137 +142,175 @@ export function Scan() {
             onNodeClick={setSelected}
             onNodeRightClick={expandNode}
           />
+
+          {/* Node count overlay */}
+          {nodes.length > 0 && (
+            <div className="absolute top-3 left-3 section-label bg-bg/80 backdrop-blur-sm px-2 py-1 rounded border border-border">
+              {nodes.length} nodes / {edges.length} edges
+            </div>
+          )}
         </div>
 
+        {/* Detail sidebar */}
         {selected && (
-          <div className="w-80 border-l border-border p-3 overflow-y-auto">
-            <div className="flex justify-between items-start mb-3">
-              <div className="text-xs text-text-muted uppercase">{selected.label}</div>
+          <div className="w-80 border-l border-border bg-bg-subtle/50 backdrop-blur-sm p-4 overflow-y-auto">
+            <div className="flex justify-between items-start mb-4">
+              <div className="section-label-accent">{selected.label}</div>
               <button
                 onClick={() => setSelected(null)}
-                className="text-text-muted hover:text-text text-xs"
+                className="text-text-muted hover:text-text text-sm leading-none"
               >
                 ×
               </button>
             </div>
-            <div className="mono text-sm text-mono mb-3">
+
+            <div className="mono text-sm text-text mb-4 break-all">
               {selected.props.address || selected.props.name || selected.id}
             </div>
 
-            {/* Properties with click-to-copy */}
-            <div className="space-y-1">
+            {/* Properties */}
+            <div className="space-y-0.5 mb-4">
               {Object.entries(selected.props).map(([k, v]) => (
                 <CopyableField key={k} label={k} value={v} />
               ))}
             </div>
 
-            <div className="flex gap-2 mt-3">
+            {/* Actions */}
+            <div className="flex gap-2 mb-4">
               <button
                 onClick={() => expandNode(selected)}
                 disabled={expanding}
-                className="text-xs px-2 py-0.5 border border-border hover:border-text-muted rounded-sm disabled:opacity-50"
+                className="btn text-[10px]"
               >
-                {expanding ? '...' : 'expand'}
+                {expanding ? (
+                  <span className="inline-block w-3 h-3 border border-text-muted/40 border-t-text-muted rounded-full animate-spin" />
+                ) : 'expand'}
               </button>
               <button
                 onClick={() => {
-                  const json = JSON.stringify(selected, null, 2)
-                  navigator.clipboard.writeText(json)
+                  navigator.clipboard.writeText(JSON.stringify(selected, null, 2))
                 }}
-                className="text-xs px-2 py-0.5 border border-border hover:border-text-muted rounded-sm"
+                className="btn text-[10px]"
               >
-                copy node
+                copy json
               </button>
             </div>
 
+            {/* Connections */}
             {edges.filter(e => e.from === selected.id || e.to === selected.id).length > 0 && (
-              <div className="mt-4">
-                <div className="text-xs text-text-muted uppercase mb-1">
+              <div>
+                <div className="section-label mb-2">
                   connections ({edges.filter(e => e.from === selected.id || e.to === selected.id).length})
                 </div>
-                {edges
-                  .filter(e => e.from === selected.id || e.to === selected.id)
-                  .map((e, i) => {
-                    const otherId = e.from === selected.id ? e.to : e.from
-                    const other = nodes.find(n => n.id === otherId)
-                    return (
-                      <div
-                        key={i}
-                        className="text-xs py-0.5 cursor-pointer hover:text-text text-text-muted"
-                        onClick={() => other && setSelected(other)}
-                      >
-                        {e.type} → {other?.props.address || other?.props.name || otherId}
-                      </div>
-                    )
-                  })}
+                <div className="space-y-0.5">
+                  {edges
+                    .filter(e => e.from === selected.id || e.to === selected.id)
+                    .map((e, i) => {
+                      const otherId = e.from === selected.id ? e.to : e.from
+                      const other = nodes.find(n => n.id === otherId)
+                      return (
+                        <div
+                          key={i}
+                          className="text-xs py-1 px-2 -mx-2 rounded cursor-pointer hover:bg-surface text-text-muted hover:text-text-secondary transition-colors mono"
+                          onClick={() => other && setSelected(other)}
+                        >
+                          <span className="text-accent/60">{e.type}</span>
+                          <span className="text-text-muted mx-1">→</span>
+                          <span>{other?.props.address || other?.props.name || otherId}</span>
+                        </div>
+                      )
+                    })}
+                </div>
               </div>
             )}
           </div>
         )}
       </div>
 
+      {/* Merge suggestions */}
       {merges.length > 0 && (
-        <div className="px-4 py-2 border-t border-border bg-surface">
-          <div className="text-xs text-text-muted uppercase mb-1">merge suggestions</div>
-          {merges.map((m, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs py-0.5">
-              <span className="mono text-mono">{m.fromName}</span>
-              <span className="text-text-muted">≈</span>
-              <span className="mono text-mono">{m.toName}</span>
-              <span className="text-text-muted">({(m.confidence * 100).toFixed(0)}%)</span>
-              <button
-                onClick={async () => {
-                  await fetch('/api/merge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromId: m.fromId, toId: m.toId, action: 'confirm' }) })
-                  setMerges(merges.filter((_, j) => j !== i))
-                }}
-                className="text-green-500 hover:underline ml-auto"
-              >confirm</button>
-              <button
-                onClick={async () => {
-                  await fetch('/api/merge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromId: m.fromId, toId: m.toId, action: 'reject' }) })
-                  setMerges(merges.filter((_, j) => j !== i))
-                }}
-                className="text-red-500 hover:underline"
-              >reject</button>
-            </div>
-          ))}
+        <div className="px-5 py-3 border-t border-border bg-bg-subtle/50">
+          <div className="section-label mb-2">merge suggestions</div>
+          <div className="space-y-1">
+            {merges.map((m, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span className="mono text-mono">{m.fromName}</span>
+                <span className="text-accent/40">≈</span>
+                <span className="mono text-mono">{m.toName}</span>
+                <span className="section-label ml-1">{(m.confidence * 100).toFixed(0)}%</span>
+                <div className="ml-auto flex gap-1">
+                  <button
+                    onClick={async () => {
+                      await fetch('/api/merge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromId: m.fromId, toId: m.toId, action: 'confirm' }) })
+                      setMerges(merges.filter((_, j) => j !== i))
+                    }}
+                    className="btn text-[10px] py-0.5 px-2 !text-accent-2 !border-accent-2/20"
+                  >confirm</button>
+                  <button
+                    onClick={async () => {
+                      await fetch('/api/merge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromId: m.fromId, toId: m.toId, action: 'reject' }) })
+                      setMerges(merges.filter((_, j) => j !== i))
+                    }}
+                    className="btn text-[10px] py-0.5 px-2 !text-critical !border-critical/20"
+                  >reject</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="flex gap-4 px-4 py-2 border-t border-border text-xs text-text-muted bg-surface items-center">
-        <span>scan: <span className="mono">{scan.seed}</span></span>
-        <span>{nodes.length} nodes</span>
-        <span>{edges.length} edges</span>
-        <span className={`px-1.5 py-0.5 rounded text-[10px] ${STATUS_STYLE[scan.status] || ''}`}>{scan.status}</span>
-        <span className="ml-auto flex gap-2 items-center">
+      {/* Status bar */}
+      <div className="flex gap-4 px-5 py-2.5 border-t border-border bg-bg-subtle/80 backdrop-blur-sm text-xs items-center">
+        <div className="flex items-center gap-2">
+          <StatusDot status={scan.status} />
+          <span className="mono text-mono">{scan.seed}</span>
+        </div>
+
+        <div className="flex gap-3 mono text-text-muted">
+          <span>{nodes.length} <span className="text-text-muted/50">nodes</span></span>
+          <span>{edges.length} <span className="text-text-muted/50">edges</span></span>
+        </div>
+
+        <div className="ml-auto flex gap-1.5">
           <button
             onClick={async () => {
               const res = await fetch(`/api/scan/${id}/export?format=json`)
               const text = await res.text()
               await navigator.clipboard.writeText(text)
             }}
-            className="px-2 py-0.5 border border-border hover:border-text-muted rounded-sm hover:text-text"
+            className="btn text-[10px] py-1"
           >
-            copy json
+            copy
           </button>
           <a
             href={`/api/scan/${id}/export?format=json`}
             download={`threadr-${id?.slice(0, 8)}.json`}
-            className="px-2 py-0.5 border border-border hover:border-text-muted rounded-sm hover:text-text inline-block"
+            className="btn text-[10px] py-1 inline-flex"
           >
-            download json
+            json
           </a>
           <a
             href={`/api/scan/${id}/export?format=graphml`}
             download={`threadr-${id?.slice(0, 8)}.graphml`}
-            className="px-2 py-0.5 border border-border hover:border-text-muted rounded-sm hover:text-text inline-block"
+            className="btn text-[10px] py-1 inline-flex"
           >
-            download graphml
+            graphml
           </a>
-        </span>
+        </div>
       </div>
     </div>
   )
+}
+
+function StatusDot({ status }: { status: string }) {
+  const cls: Record<string, string> = {
+    queued: '',
+    running: 'status-dot-active',
+    done: 'status-dot-active',
+    failed: 'status-dot-critical',
+  }
+  return <div className={`status-dot ${cls[status] || ''}`} style={!cls[status] ? { background: 'var(--color-text-muted)' } : {}} />
 }
 
 function CopyableField({ label, value }: { label: string; value: string }) {
@@ -278,7 +318,7 @@ function CopyableField({ label, value }: { label: string; value: string }) {
 
   return (
     <div
-      className="flex items-start gap-1 text-xs group cursor-pointer rounded px-1 -mx-1 hover:bg-border/30"
+      className="flex items-start gap-1.5 text-xs group cursor-pointer rounded px-2 py-1 -mx-2 hover:bg-surface transition-colors"
       onClick={() => {
         navigator.clipboard.writeText(value)
         setCopied(true)
@@ -286,9 +326,9 @@ function CopyableField({ label, value }: { label: string; value: string }) {
       }}
       title="click to copy"
     >
-      <span className="text-text-muted shrink-0">{label}:</span>
-      <span className="mono text-mono break-all flex-1">{value}</span>
-      <span className="text-text-muted opacity-0 group-hover:opacity-100 shrink-0 text-[10px]">
+      <span className="text-text-muted shrink-0 section-label !text-[10px]">{label}</span>
+      <span className="mono text-mono break-all flex-1 text-[11px]">{value}</span>
+      <span className="text-text-muted opacity-0 group-hover:opacity-100 shrink-0 mono text-[10px] transition-opacity">
         {copied ? '✓' : 'copy'}
       </span>
     </div>

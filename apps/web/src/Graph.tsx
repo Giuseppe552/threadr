@@ -7,12 +7,12 @@ const NODE_COLORS: Record<string, string> = {
   IP: '#f59e0b',
   Username: '#a78bfa',
   Breach: '#ef4444',
-  Certificate: '#6b7280',
+  Certificate: '#64748b',
   Person: '#e0e0e0',
   Organization: '#14b8a6',
-  Repository: '#6b7280',
+  Repository: '#64748b',
   Phone: '#f59e0b',
-  Port: '#6b7280',
+  Port: '#64748b',
 }
 
 interface Node {
@@ -56,7 +56,7 @@ export function Graph({ nodes, edges, selectedId, onNodeClick, onNodeRightClick,
       id: n.id,
       label: n.label,
       name: n.props.address || n.props.name || n.id,
-      color: NODE_COLORS[n.label] || '#666',
+      color: NODE_COLORS[n.label] || '#555',
       _raw: n,
       _deg: degree[n.id] || 0,
     })),
@@ -72,27 +72,45 @@ export function Graph({ nodes, edges, selectedId, onNodeClick, onNodeRightClick,
   const paintNode = useCallback((node: any, ctx: CanvasRenderingContext2D) => {
     const size = Math.max(4, Math.min(14, 3 + node._deg * 1.5))
 
-    // selection ring
+    // Outer glow for high-degree nodes
+    if (node._deg > 3) {
+      ctx.beginPath()
+      ctx.arc(node.x, node.y, size + 6, 0, 2 * Math.PI)
+      ctx.fillStyle = node.color
+      ctx.globalAlpha = 0.06
+      ctx.fill()
+      ctx.globalAlpha = 1
+    }
+
+    // Selection ring
     if (selectedId && node.id === selectedId) {
       ctx.beginPath()
-      ctx.arc(node.x, node.y, size + 3, 0, 2 * Math.PI)
-      ctx.strokeStyle = node.color
+      ctx.arc(node.x, node.y, size + 4, 0, 2 * Math.PI)
+      ctx.strokeStyle = '#3b9eff'
       ctx.lineWidth = 2
-      ctx.globalAlpha = 0.35
+      ctx.globalAlpha = 0.5
       ctx.stroke()
       ctx.globalAlpha = 1
     }
 
+    // Node circle
     ctx.beginPath()
     ctx.arc(node.x, node.y, size, 0, 2 * Math.PI)
     ctx.fillStyle = node.color
     ctx.fill()
 
-    const fontSize = Math.max(10, size)
+    // Inner highlight
+    ctx.beginPath()
+    ctx.arc(node.x, node.y, size * 0.4, 0, 2 * Math.PI)
+    ctx.fillStyle = 'rgba(255,255,255,0.15)'
+    ctx.fill()
+
+    // Label
+    const fontSize = Math.max(9, Math.min(11, size))
     ctx.font = `${fontSize}px 'JetBrains Mono', monospace`
-    ctx.fillStyle = '#ccc'
+    ctx.fillStyle = 'rgba(228, 232, 240, 0.7)'
     ctx.textAlign = 'center'
-    ctx.fillText(node.name.slice(0, 18), node.x, node.y + size + fontSize + 1)
+    ctx.fillText(node.name.slice(0, 22), node.x, node.y + size + fontSize + 2)
   }, [selectedId])
 
   return (
@@ -101,7 +119,7 @@ export function Graph({ nodes, edges, selectedId, onNodeClick, onNodeRightClick,
       graphData={graphData}
       width={width}
       height={height}
-      backgroundColor="#0a0a0a"
+      backgroundColor="#080b12"
       nodeCanvasObject={paintNode}
       nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
         const size = Math.max(6, Math.min(16, 5 + (node._deg || 0) * 1.5))
@@ -113,14 +131,14 @@ export function Graph({ nodes, edges, selectedId, onNodeClick, onNodeRightClick,
       nodeLabel={(node: any) => `${node.label}: ${node.name}`}
       linkColor={(link: any) => {
         if (link._isProbably) return `rgba(168, 85, 247, ${link.confidence || 0.5})`
-        if (link.type === 'EXPOSED_IN') return '#ef4444'
-        if (link.type === 'OPEN_PORT') return '#f59e0b'
-        return '#555'
+        if (link.type === 'EXPOSED_IN') return 'rgba(239, 68, 68, 0.7)'
+        if (link.type === 'OPEN_PORT') return 'rgba(245, 158, 11, 0.6)'
+        return 'rgba(94, 104, 120, 0.3)'
       }}
       linkWidth={(link: any) => {
         if (link._isProbably) return (link.confidence || 0.5) * 3
         if (link.type === 'EXPOSED_IN') return 1.5
-        return 0.8
+        return 0.6
       }}
       linkLineDash={(link: any) => link._isProbably ? [4, 2] : null}
       linkDirectionalArrowLength={4}

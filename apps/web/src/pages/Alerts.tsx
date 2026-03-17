@@ -21,11 +21,11 @@ interface Monitor {
   active: number
 }
 
-const SEV_COLORS: Record<string, string> = {
-  critical: 'bg-red-500/20 text-red-400 border-red-500/30',
-  high: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  low: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+const SEV_CLASS: Record<string, string> = {
+  critical: 'sev-critical',
+  high: 'sev-high',
+  medium: 'sev-medium',
+  low: 'sev-low',
 }
 
 export function Alerts() {
@@ -53,64 +53,75 @@ export function Alerts() {
     setMonitors(monitors.filter(m => m.id !== id))
   }
 
+  const unseen = alerts.filter(a => !a.seen).length
+
   return (
-    <div className="p-4 max-w-4xl">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="text-xs text-text-muted uppercase tracking-wider">alerts</div>
+    <div className="p-5 max-w-5xl">
+      {/* Header + filters */}
+      <div className="flex items-center gap-3 mb-5">
+        <div className="section-label">
+          alerts
+          {unseen > 0 && <span className="ml-2 text-critical">{unseen} new</span>}
+        </div>
         <div className="flex gap-1 ml-auto">
           {['', 'critical', 'high', 'medium', 'low'].map(s => (
             <button
               key={s}
               onClick={() => { setFilter(s); setTimeout(fetchAlerts, 0) }}
-              className={`text-xs px-2 py-0.5 rounded-sm border ${filter === s ? 'border-text-muted text-text' : 'border-border text-text-muted'}`}
+              className={`btn text-[10px] py-1 px-2 ${filter === s ? '!border-accent/30 !text-accent !bg-accent/8' : ''}`}
             >{s || 'all'}</button>
           ))}
         </div>
       </div>
 
+      {/* Alert list */}
       {alerts.length === 0 ? (
-        <div className="text-sm text-text-muted">no alerts yet</div>
+        <div className="intel-card p-8 text-center">
+          <div className="mono text-text-muted text-sm">no alerts</div>
+          <div className="text-text-muted text-xs mt-1">set up a monitor on any scan to start receiving alerts</div>
+        </div>
       ) : (
-        <div className="space-y-1 mb-8">
+        <div className="space-y-1.5 mb-10">
           {alerts.map(a => (
-            <div key={a.id} className={`flex items-center gap-3 text-sm py-1.5 px-2 rounded-sm ${a.seen ? 'opacity-50' : ''}`}>
-              <span className={`text-xs px-1.5 py-0.5 rounded border ${SEV_COLORS[a.severity] || ''}`}>{a.severity}</span>
-              <span className="flex-1">{a.title}</span>
-              <span className="text-xs text-text-muted">{a.type}</span>
+            <div
+              key={a.id}
+              className={`intel-card flex items-center gap-3 px-4 py-3 transition-opacity ${a.seen ? 'opacity-40' : ''}`}
+            >
+              <span className={`mono text-[10px] px-2 py-0.5 rounded ${SEV_CLASS[a.severity] || ''}`}>
+                {a.severity}
+              </span>
+              <span className="flex-1 text-sm text-text-secondary">{a.title}</span>
+              <span className="section-label">{a.type}</span>
               {!a.seen && (
-                <button onClick={() => markSeen(a.id)} className="text-xs text-text-muted hover:text-text">mark seen</button>
+                <button onClick={() => markSeen(a.id)} className="btn text-[10px] py-0.5 px-2">dismiss</button>
               )}
             </div>
           ))}
         </div>
       )}
 
-      <div className="text-xs text-text-muted uppercase tracking-wider mb-3">monitors</div>
+      {/* Monitors */}
+      <div className="section-label mb-3">active monitors</div>
       {monitors.length === 0 ? (
-        <div className="text-sm text-text-muted">no monitors configured</div>
+        <div className="intel-card p-6 text-center">
+          <div className="text-text-muted text-xs">no monitors configured</div>
+        </div>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-text-muted text-xs border-b border-border">
-              <th className="py-1 pr-4">seed</th>
-              <th className="py-1 pr-4">interval</th>
-              <th className="py-1 pr-4">next run</th>
-              <th className="py-1"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {monitors.map(m => (
-              <tr key={m.id} className="border-b border-border">
-                <td className="py-1.5 pr-4 mono text-mono">{m.seed}</td>
-                <td className="py-1.5 pr-4 text-text-muted">{m.interval}</td>
-                <td className="py-1.5 pr-4 text-text-muted text-xs">{m.next_run ? new Date(m.next_run).toLocaleString() : '-'}</td>
-                <td className="py-1.5">
-                  <button onClick={() => deleteMonitor(m.id)} className="text-xs text-red-500 hover:underline">delete</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="space-y-1.5">
+          {monitors.map(m => (
+            <div key={m.id} className="intel-card flex items-center gap-4 px-4 py-3">
+              <div className="status-dot status-dot-active" />
+              <span className="mono text-sm text-mono flex-1">{m.seed}</span>
+              <span className="section-label">{m.interval}</span>
+              <span className="text-xs text-text-muted mono">
+                next: {m.next_run ? new Date(m.next_run).toLocaleDateString() : '-'}
+              </span>
+              <button onClick={() => deleteMonitor(m.id)} className="btn text-[10px] py-0.5 px-2 !text-critical !border-critical/20 hover:!bg-critical/10">
+                remove
+              </button>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )

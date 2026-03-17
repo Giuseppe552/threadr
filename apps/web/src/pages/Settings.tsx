@@ -48,71 +48,83 @@ export function Settings() {
   }
 
   const keyed = plugins.filter(p => p.requiresKey)
+  const configuredIds = new Set(keys.map(k => k.plugin_id))
 
   return (
-    <div className="p-4 max-w-3xl">
-      <div className="text-xs text-text-muted uppercase tracking-wider mb-3">plugins</div>
-      <table className="w-full text-sm mb-8">
-        <thead>
-          <tr className="text-left text-text-muted text-xs border-b border-border">
-            <th className="py-1 pr-4">plugin</th>
-            <th className="py-1 pr-4">requires key</th>
-            <th className="py-1">status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {plugins.map(p => (
-            <tr key={p.id} className="border-b border-border">
-              <td className="py-1.5 pr-4 mono">{p.id}</td>
-              <td className="py-1.5 pr-4 text-text-muted">{p.requiresKey ? 'yes' : 'no'}</td>
-              <td className="py-1.5">
-                {p.requiresKey
-                  ? keys.some(k => k.plugin_id === p.id) ? <span className="text-green-500">configured</span> : <span className="text-text-muted">no key</span>
-                  : <span className="text-green-500">active</span>}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="p-5 max-w-4xl">
+      {/* Plugin status */}
+      <div className="section-label mb-3">plugins</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-10">
+        {plugins.map(p => {
+          const hasKey = configuredIds.has(p.id)
+          const active = !p.requiresKey || hasKey
+          return (
+            <div key={p.id} className="intel-card px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className={`status-dot ${active ? 'status-dot-active' : ''}`}
+                     style={active ? {} : { background: 'var(--color-text-muted)', opacity: 0.3 }} />
+                <span className="mono text-xs text-text-secondary">{p.id}</span>
+              </div>
+              <div className="text-[11px] text-text-muted">{p.name}</div>
+              {p.requiresKey && !hasKey && (
+                <div className="text-[10px] text-high mt-1 mono">needs api key</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
 
-      <div className="text-xs text-text-muted uppercase tracking-wider mb-3">api keys</div>
+      {/* API Keys */}
+      <div className="section-label mb-3">api keys</div>
 
       {keys.length > 0 && (
-        <div className="space-y-1 mb-4">
+        <div className="space-y-1.5 mb-5">
           {keys.map(k => (
-            <div key={k.id} className="flex items-center gap-3 text-sm">
-              <span className="mono text-mono">{k.plugin_id}</span>
-              <span className="text-text-muted">{k.label || '(no label)'}</span>
-              <button onClick={() => removeKey(k.id)} className="text-red-500 text-xs hover:underline ml-auto">remove</button>
+            <div key={k.id} className="intel-card flex items-center gap-3 px-4 py-2.5">
+              <div className="status-dot status-dot-active" />
+              <span className="mono text-xs text-mono">{k.plugin_id}</span>
+              <span className="text-xs text-text-muted flex-1">{k.label || ''}</span>
+              <button onClick={() => removeKey(k.id)} className="btn text-[10px] py-0.5 px-2 !text-critical !border-critical/20 hover:!bg-critical/10">
+                revoke
+              </button>
             </div>
           ))}
         </div>
       )}
 
-      <form onSubmit={addKey} className="flex gap-2 items-end">
-        <select
-          value={pluginId}
-          onChange={e => setPluginId(e.target.value)}
-          className="bg-surface border border-border px-2 py-1 text-sm rounded-sm"
-        >
-          <option value="">plugin...</option>
-          {keyed.map(p => <option key={p.id} value={p.id}>{p.id}</option>)}
-        </select>
-        <input
-          type="password"
-          value={keyVal}
-          onChange={e => setKeyVal(e.target.value)}
-          placeholder="api key"
-          className="flex-1 bg-surface border border-border px-2 py-1 text-sm mono rounded-sm"
-        />
-        <input
-          type="text"
-          value={label}
-          onChange={e => setLabel(e.target.value)}
-          placeholder="label (optional)"
-          className="w-32 bg-surface border border-border px-2 py-1 text-sm rounded-sm"
-        />
-        <button type="submit" className="px-3 py-1 text-sm bg-surface border border-border hover:border-text-muted rounded-sm">add</button>
+      <form onSubmit={addKey} className="intel-card p-4">
+        <div className="section-label mb-3">add key</div>
+        <div className="flex gap-2 items-end flex-wrap">
+          <div className="flex-shrink-0">
+            <select
+              value={pluginId}
+              onChange={e => setPluginId(e.target.value)}
+              className="input !w-auto"
+            >
+              <option value="">plugin...</option>
+              {keyed.map(p => <option key={p.id} value={p.id}>{p.id}</option>)}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <input
+              type="password"
+              value={keyVal}
+              onChange={e => setKeyVal(e.target.value)}
+              placeholder="api key"
+              className="input"
+            />
+          </div>
+          <div className="w-36">
+            <input
+              type="text"
+              value={label}
+              onChange={e => setLabel(e.target.value)}
+              placeholder="label"
+              className="input"
+            />
+          </div>
+          <button type="submit" className="btn btn-primary">add</button>
+        </div>
       </form>
     </div>
   )
