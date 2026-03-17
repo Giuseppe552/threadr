@@ -7,7 +7,7 @@
 
 OSINT tool for security professionals. Feed it an email, domain, or username — it maps connected accounts, infrastructure, and metadata into a graph.
 
-![threadr scan demo](demo.jpg)
+![threadr scan demo](.github/demo.jpg)
 
 100% self-hosted. No cloud. No telemetry. Your keys, your data.
 
