@@ -40,6 +40,29 @@ open http://localhost
 
 Three commands. Neo4j, Redis, and SQLite are handled by the compose file.
 
+## cli
+
+No browser needed. Scans run directly against Neo4j, bypassing the queue and API server.
+
+```sh
+# scan an email, output JSON
+npm run cli -- scan user@example.com
+
+# scan a domain with 3 levels of expansion, output GraphML
+npm run cli -- scan example.com --depth 3 --format graphml > graph.xml
+
+# scan with specific plugins only, suppress logs
+npm run cli -- scan user@example.com --plugins dns,whois,crtsh -q | jq '.nodes[]'
+
+# dump existing graph data
+npm run cli -- graph example.com
+
+# list all plugins
+npm run cli -- plugins
+```
+
+Pipe into `jq`, `grep`, other tools. Automate with cron. Run from CI/CD.
+
 ## development
 
 ```sh
