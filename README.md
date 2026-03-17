@@ -7,6 +7,8 @@
 
 OSINT tool for security professionals. Feed it an email, domain, or username — it maps connected accounts, infrastructure, and metadata into a graph.
 
+[![demo](https://asciinema.org/a/0DS8H31u6hZacUGC.svg)](https://asciinema.org/a/0DS8H31u6hZacUGC)
+
 100% self-hosted. No cloud. No telemetry. Your keys, your data.
 
 ## Run it
