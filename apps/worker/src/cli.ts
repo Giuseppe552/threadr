@@ -20,6 +20,7 @@ import type { SeedNode, NodeType, Plugin } from '@threadr/shared'
 import { storeNode, storeEdge, close as closeGraph } from './graph.js'
 import { loadKeysFromDb, keyring } from './keyring.js'
 import { resolve } from './resolver.js'
+import { configureProxy } from './proxy.js'
 
 // Import all plugins
 import { github } from './plugins/github.js'
@@ -58,6 +59,9 @@ interface CliOpts {
   depth: number
   plugins: string[] | null // null = all
   quiet: boolean
+  proxy: boolean
+  proxyPorts: string | null // e.g. "9051-9060" or "9150"
+  chaff: boolean
 }
 
 function parseArgs(argv: string[]): CliOpts {
@@ -69,6 +73,9 @@ function parseArgs(argv: string[]): CliOpts {
     depth: 2,
     plugins: null,
     quiet: false,
+    proxy: false,
+    proxyPorts: null,
+    chaff: false,
   }
 
   for (let i = 2; i < args.length; i++) {
@@ -88,6 +95,16 @@ function parseArgs(argv: string[]): CliOpts {
       case '--quiet':
       case '-q':
         opts.quiet = true
+        break
+      case '--proxy':
+        opts.proxy = true
+        break
+      case '--proxy-ports':
+        opts.proxyPorts = args[++i]
+        opts.proxy = true
+        break
+      case '--chaff':
+        opts.chaff = true
         break
     }
   }
@@ -155,6 +172,19 @@ async function runDirectScan(opts: CliOpts) {
   }
 
   loadKeysFromDb()
+
+  // Configure proxy if requested
+  if (opts.proxy) {
+    const proxies = parseProxyPorts(opts.proxyPorts)
+    configureProxy({
+      enabled: true,
+      proxies,
+      chaffEnabled: opts.chaff,
+      chaffRatio: 0.3,
+      jitterMeanMs: 2000,
+    })
+    log(quiet, `[*] proxy: enabled (${proxies.length} SOCKS5 endpoints, chaff=${opts.chaff})`)
+  }
 
   const type = detectSeedType(seed)
   const { label, key } = seedTypeToNode[type]
@@ -275,7 +305,22 @@ async function dumpGraph(opts: CliOpts) {
 
 // --- main ---
 
-const HELP = `threadr — OSINT reconnaissance tool
+function parseProxyPorts(portsStr: string | null): { host: string; port: number }[] {
+  if (!portsStr) return [{ host: '127.0.0.1', port: 9150 }]
+
+  // Support range: "9051-9060" or single: "9150" or list: "9051,9052,9053"
+  if (portsStr.includes('-')) {
+    const [start, end] = portsStr.split('-').map(Number)
+    const proxies: { host: string; port: number }[] = []
+    for (let p = start; p <= end; p++) {
+      proxies.push({ host: '127.0.0.1', port: p })
+    }
+    return proxies
+  }
+  return portsStr.split(',').map(p => ({ host: '127.0.0.1', port: parseInt(p.trim(), 10) }))
+}
+
+const HELP = `threadr — OSINT tool for security professionals
 
 usage:
   threadr scan <seed> [options]     run a scan
@@ -287,11 +332,15 @@ options:
   --depth, -d   <n>                 expansion depth (default: 2)
   --plugins, -p <list>              comma-separated plugin IDs
   --quiet, -q                       suppress log output (stderr)
+  --proxy                           route all traffic through SOCKS5/Tor
+  --proxy-ports <ports>             proxy ports (default: 9150, range: 9051-9060)
+  --chaff                           mix decoy requests with real traffic
 
 examples:
   threadr scan user@example.com
   threadr scan example.com --depth 3 --format graphml > graph.xml
   threadr scan user@example.com --plugins dns,whois,crtsh -q | jq '.nodes[]'
+  threadr scan example.com --proxy --proxy-ports 9051-9060 --chaff
   threadr graph example.com --format json
 `
 

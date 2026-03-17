@@ -71,6 +71,44 @@ services:
       interval: 5s
       retries: 3
 
+  # --- Tor proxy instances (optional, start with: docker compose --profile tor up -d) ---
+  # Each instance runs an isolated Tor circuit with a different exit IP.
+  # Plugins are mapped to different instances so no single exit sees the full query pattern.
+  tor-1:
+    image: peterdavehello/tor-socks-proxy:latest
+    restart: unless-stopped
+    ports:
+      - '9051:9150'
+    profiles: [tor]
+
+  tor-2:
+    image: peterdavehello/tor-socks-proxy:latest
+    restart: unless-stopped
+    ports:
+      - '9052:9150'
+    profiles: [tor]
+
+  tor-3:
+    image: peterdavehello/tor-socks-proxy:latest
+    restart: unless-stopped
+    ports:
+      - '9053:9150'
+    profiles: [tor]
+
+  tor-4:
+    image: peterdavehello/tor-socks-proxy:latest
+    restart: unless-stopped
+    ports:
+      - '9054:9150'
+    profiles: [tor]
+
+  tor-5:
+    image: peterdavehello/tor-socks-proxy:latest
+    restart: unless-stopped
+    ports:
+      - '9055:9150'
+    profiles: [tor]
+
 volumes:
   neo4j_data:
   sqlite_data:
