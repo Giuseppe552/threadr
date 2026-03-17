@@ -11,7 +11,8 @@
     "test": "npm run test --workspaces --if-present",
     "dev:worker": "npm run dev -w apps/worker",
     "dev:api": "npm run dev -w apps/api",
-    "dev": "npm run dev:api & npm run dev:worker & npm run dev -w apps/web & wait"
+    "dev": "npm run dev:api & npm run dev:worker & npm run dev -w apps/web & wait",
+    "cli": "tsx apps/worker/src/cli.ts"
   },
   "devDependencies": {
     "@types/node": "^25.3.3",

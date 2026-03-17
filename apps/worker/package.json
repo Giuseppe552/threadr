@@ -6,7 +6,11 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "lint": "tsc --noEmit",
-    "test": "echo 'no tests'"
+    "test": "echo 'no tests'",
+    "cli": "tsx src/cli.ts"
+  },
+  "bin": {
+    "threadr": "./dist/cli.js"
   },
   "dependencies": {
     "@threadr/shared": "*",

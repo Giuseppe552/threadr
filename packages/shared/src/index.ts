@@ -71,6 +71,8 @@ export interface KeyRing {
   markBurned(pluginId: string, key: string): void
 }
 
+export { toGraphML } from './graphml.js'
+
 export { jaro, jaroWinkler, compareEntities, computeScore } from './scoring.js'
 export type { EntityFields, MatchCandidate } from './scoring.js'
 

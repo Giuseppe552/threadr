@@ -5,7 +5,8 @@ import { Queue } from 'bullmq'
 import { randomUUID } from 'node:crypto'
 import { db } from './db.js'
 import { getGraph, getMerges, confirmMerge, rejectMerge } from './graph.js'
-import { toGraphML, detectSeedType } from './graphml.js'
+import { toGraphML } from '@threadr/shared'
+import { detectSeedType } from './graphml.js'
 
 const scanQueue = new Queue('scans', {
   connection: { host: process.env.REDIS_HOST || 'localhost', port: 6379 },
