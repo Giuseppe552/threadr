@@ -73,6 +73,16 @@ export interface KeyRing {
 
 export { toGraphML } from './graphml.js'
 
+export {
+  levySample, levyDelay, laplaceMechanism, privateTimingDelay,
+  batchRelease, timingEntropy,
+  generateSessionNonce, selectProxy, generateProxyMap, uniformityTest,
+  generateCoverTraffic, interleaveWithCover,
+  auditTraffic, ksTest, autocorrelation, runsTest,
+} from './anonymity/index.js'
+
+export type { BrowsingState, AuditResult } from './anonymity/index.js'
+
 export { jaro, jaroWinkler, compareEntities, computeScore } from './scoring.js'
 export type { EntityFields, MatchCandidate } from './scoring.js'
 
