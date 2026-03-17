@@ -108,9 +108,21 @@ Everything links together. An email leads to a GitHub account, which leads to co
 | email-validation | Email | no | MX check + SMTP RCPT TO probe + catch-all detection |
 | securitytrails | Domain, IP | yes | passive DNS history, subdomains, associated domains |
 
-13 plugins work without any API keys. Add Shodan, VirusTotal, HIBP, or SecurityTrails keys in the settings page for deeper coverage. Plugins that need keys are skipped when none are configured.
+13 plugins work without any API keys. 4 need keys you provide yourself (Shodan, VirusTotal, HIBP, SecurityTrails). Plugins without keys are silently skipped.
 
 Writing your own plugin takes about 30 lines. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## no central server
+
+threadr is 100% self-hosted. There is no threadr.com, no cloud service, no central API, no telemetry, no phone-home.
+
+- **Your API keys stay on your machine.** They're stored in a local SQLite file, never transmitted anywhere except to the API they belong to (Shodan, GitHub, etc.).
+- **Your scan data stays on your machine.** Neo4j runs locally in Docker. Nothing leaves your network.
+- **There's nothing to pay for.** No subscription, no usage fees, no premium tier. The tool runs on your hardware, uses your bandwidth, queries APIs with your keys.
+- **No rate limits from us** because there is no "us." The only rate limits are from the external APIs themselves (GitHub: 10 req/min unauthenticated, Shodan: depends on plan, etc.).
+- **Tor proxies run locally.** The Docker Compose Tor instances are on your machine. Traffic exits through the Tor network, not through any threadr infrastructure.
+
+If you clone this repo and run `docker compose up -d`, the only external connections are the ones your plugins make to their data sources. That's it.
 
 ## entity resolution
 
@@ -181,7 +193,7 @@ That said, tools don't have intent — people do. This tool is built for defense
 
 If you discover someone's personal information through threadr, the right thing to do is tell them, not exploit it.
 
-All plugins respect API rate limits. The tool identifies itself as `threadr/0.1` in User-Agent headers. No stealth, no evasion, no deception.
+All plugins respect upstream API rate limits. In default mode, the tool identifies itself as `threadr/0.1` in User-Agent headers. In stealth mode (`--stealth`), it mimics a standard browser to avoid bot detection.
 
 ## data access
 

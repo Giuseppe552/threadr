@@ -92,11 +92,12 @@ function smtpCheck(host: string, email: string): Promise<SmtpResult> {
       if (step === 0) {
         // Banner
         banner = lines
-        socket.write('EHLO threadr.local\r\n')
+        // Generic EHLO — don't identify as threadr
+        socket.write('EHLO mail.local\r\n')
         step = 1
       } else if (step === 1) {
         // EHLO response
-        socket.write(`MAIL FROM:<check@threadr.local>\r\n`)
+        socket.write(`MAIL FROM:<postmaster@mail.local>\r\n`)
         step = 2
       } else if (step === 2) {
         // MAIL FROM response
