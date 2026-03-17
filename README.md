@@ -1,6 +1,8 @@
 # threadr
 
-OSINT reconnaissance tool that maps relationships between digital identities. Feed it an email, domain, or username and it builds a graph of connected accounts, infrastructure, and metadata.
+OSINT reconnaissance tool for security professionals. Maps relationships between digital identities to help defenders understand their attack surface, verify their own exposure, and investigate incidents.
+
+Feed it an email, domain, or username. It queries public data sources and builds a graph of connected accounts, infrastructure, and metadata.
 
 Free. Open source. Self-hosted. No cloud, no accounts, no tracking.
 
@@ -161,6 +163,36 @@ threadr has fewer data sources than Maltego or SpiderFoot. What it has is automa
 - **graph db**: Neo4j
 - **queue**: Redis
 - **metadata**: SQLite (better-sqlite3, WAL mode)
+
+## who this is for
+
+- **Security teams** — map your organization's external attack surface. Find forgotten subdomains, exposed services, leaked credentials, misconfigured DNS.
+- **Pentesters** — authorized reconnaissance during engagements. Document the OSINT phase with exportable graphs and reproducible data.
+- **Incident responders** — during a breach, trace how an attacker might have discovered your infrastructure. Understand what's publicly visible.
+- **Bug bounty hunters** — enumerate targets within authorized scope. The graph view makes it easy to spot overlooked assets.
+- **Individuals** — check your own digital footprint. See what an attacker would find if they searched your email address.
+- **Journalists** — verify source claims, investigate public-interest infrastructure. All data comes from public sources.
+
+## responsible use
+
+threadr queries publicly available data sources. It does not break into systems, bypass authentication, or access private data. Every data point it finds is already public.
+
+That said, tools don't have intent — people do. This tool is built for defense: understanding exposure, securing infrastructure, responding to incidents. Using it to stalk, harass, or target individuals is not what it's for and is likely illegal in your jurisdiction.
+
+If you discover someone's personal information through threadr, the right thing to do is tell them, not exploit it.
+
+All plugins respect API rate limits. The tool identifies itself as `threadr/0.1` in User-Agent headers. No stealth, no evasion, no deception.
+
+## data access
+
+Every scan result is downloadable in two formats:
+
+- **JSON** — full graph with nodes, edges, properties, timestamps. Pipe into `jq`, load into Python, feed into other tools.
+- **GraphML** — standard graph format. Import directly into Gephi, yEd, Cytoscape, or any graph analysis tool.
+
+From the web UI: export links are in the bottom bar of every scan. From the CLI: JSON goes to stdout by default, `--format graphml` for GraphML.
+
+No accounts, no paywalls, no "export is a premium feature." You ran the scan on your machine. The data is yours.
 
 ## support
 

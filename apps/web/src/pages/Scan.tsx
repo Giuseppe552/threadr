@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { Graph } from '../Graph.tsx'
 
@@ -143,7 +143,7 @@ export function Scan() {
         </div>
 
         {selected && (
-          <div className="w-72 border-l border-border p-3 overflow-y-auto">
+          <div className="w-80 border-l border-border p-3 overflow-y-auto">
             <div className="flex justify-between items-start mb-3">
               <div className="text-xs text-text-muted uppercase">{selected.label}</div>
               <button
@@ -156,12 +156,11 @@ export function Scan() {
             <div className="mono text-sm text-mono mb-3">
               {selected.props.address || selected.props.name || selected.id}
             </div>
-            <div className="space-y-1.5">
+
+            {/* Properties with click-to-copy */}
+            <div className="space-y-1">
               {Object.entries(selected.props).map(([k, v]) => (
-                <div key={k} className="text-xs">
-                  <span className="text-text-muted">{k}: </span>
-                  <span className="mono text-mono">{v}</span>
-                </div>
+                <CopyableField key={k} label={k} value={v} />
               ))}
             </div>
 
@@ -172,6 +171,15 @@ export function Scan() {
                 className="text-xs px-2 py-0.5 border border-border hover:border-text-muted rounded-sm disabled:opacity-50"
               >
                 {expanding ? '...' : 'expand'}
+              </button>
+              <button
+                onClick={() => {
+                  const json = JSON.stringify(selected, null, 2)
+                  navigator.clipboard.writeText(json)
+                }}
+                className="text-xs px-2 py-0.5 border border-border hover:border-text-muted rounded-sm"
+              >
+                copy node
               </button>
             </div>
 
@@ -229,17 +237,60 @@ export function Scan() {
         </div>
       )}
 
-      <div className="flex gap-4 px-4 py-1.5 border-t border-border text-xs text-text-muted bg-surface">
+      <div className="flex gap-4 px-4 py-2 border-t border-border text-xs text-text-muted bg-surface items-center">
         <span>scan: <span className="mono">{scan.seed}</span></span>
         <span>{nodes.length} nodes</span>
         <span>{edges.length} edges</span>
         <span className={`px-1.5 py-0.5 rounded text-[10px] ${STATUS_STYLE[scan.status] || ''}`}>{scan.status}</span>
-        <span className="ml-auto flex gap-2">
-          <a href={`/api/scan/${id}/export?format=json`} download className="hover:text-text">export json</a>
-          <span className="text-border">|</span>
-          <a href={`/api/scan/${id}/export?format=graphml`} download className="hover:text-text">export graphml</a>
+        <span className="ml-auto flex gap-2 items-center">
+          <button
+            onClick={async () => {
+              const res = await fetch(`/api/scan/${id}/export?format=json`)
+              const text = await res.text()
+              await navigator.clipboard.writeText(text)
+            }}
+            className="px-2 py-0.5 border border-border hover:border-text-muted rounded-sm hover:text-text"
+          >
+            copy json
+          </button>
+          <a
+            href={`/api/scan/${id}/export?format=json`}
+            download={`threadr-${id?.slice(0, 8)}.json`}
+            className="px-2 py-0.5 border border-border hover:border-text-muted rounded-sm hover:text-text inline-block"
+          >
+            download json
+          </a>
+          <a
+            href={`/api/scan/${id}/export?format=graphml`}
+            download={`threadr-${id?.slice(0, 8)}.graphml`}
+            className="px-2 py-0.5 border border-border hover:border-text-muted rounded-sm hover:text-text inline-block"
+          >
+            download graphml
+          </a>
         </span>
       </div>
+    </div>
+  )
+}
+
+function CopyableField({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false)
+
+  return (
+    <div
+      className="flex items-start gap-1 text-xs group cursor-pointer rounded px-1 -mx-1 hover:bg-border/30"
+      onClick={() => {
+        navigator.clipboard.writeText(value)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1200)
+      }}
+      title="click to copy"
+    >
+      <span className="text-text-muted shrink-0">{label}:</span>
+      <span className="mono text-mono break-all flex-1">{value}</span>
+      <span className="text-text-muted opacity-0 group-hover:opacity-100 shrink-0 text-[10px]">
+        {copied ? '✓' : 'copy'}
+      </span>
     </div>
   )
 }
