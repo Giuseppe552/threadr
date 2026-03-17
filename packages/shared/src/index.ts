@@ -79,6 +79,7 @@ export {
   generateSessionNonce, selectProxy, generateProxyMap, uniformityTest,
   generateCoverTraffic, interleaveWithCover,
   auditTraffic, ksTest, autocorrelation, runsTest,
+  generateDecoys, interleaveTargets, identificationProbability,
 } from './anonymity/index.js'
 
 export type { BrowsingState, AuditResult } from './anonymity/index.js'

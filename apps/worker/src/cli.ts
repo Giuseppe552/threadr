@@ -321,6 +321,44 @@ async function dumpGraph(opts: CliOpts) {
   }
 }
 
+async function runAudit(opts: CliOpts) {
+  // Audit requires proxy to be configured
+  if (!opts.proxy) {
+    opts.proxy = true
+    opts.stealth = true
+  }
+
+  const proxies = parseProxyPorts(opts.proxyPorts)
+  configureProxy({
+    enabled: true,
+    proxies,
+    chaffEnabled: false, // no chaff during audit
+    chaffRatio: 0,
+    jitterMeanMs: 1000,
+    profileId: opts.profile,
+    forceHttp1: true,
+    sessionCookies: true,
+    referrerChain: true,
+  })
+
+  const { runStealthAudit } = await import('./stealth/audit.js')
+  const result = await runStealthAudit(10)
+
+  process.stderr.write('\n')
+  process.stderr.write(`  stealth audit — ${result.profileId}\n`)
+  process.stderr.write(`  ${'—'.repeat(40)}\n`)
+
+  for (const check of result.checks) {
+    const icon = check.passed ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'
+    process.stderr.write(`  ${icon} ${check.name.padEnd(24)} ${check.detail}\n`)
+  }
+
+  process.stderr.write(`\n  ${result.passed ? '\x1b[32mPASSED\x1b[0m' : '\x1b[31mFAILED\x1b[0m'}\n\n`)
+
+  // JSON output for piping
+  process.stdout.write(JSON.stringify(result, null, 2) + '\n')
+}
+
 // --- main ---
 
 function parseProxyPorts(portsStr: string | null): { host: string; port: number }[] {
@@ -344,6 +382,7 @@ usage:
   threadr scan <seed> [options]     run a scan
   threadr graph <seed> [options]    dump existing graph
   threadr plugins                   list available plugins
+  threadr audit [options]           verify stealth stack works
 
 options:
   --format, -f  json|graphml        output format (default: json)
@@ -383,6 +422,9 @@ async function main() {
       break
     case 'plugins':
       await listPlugins()
+      break
+    case 'audit':
+      await runAudit(opts)
       break
     default:
       process.stdout.write(HELP)

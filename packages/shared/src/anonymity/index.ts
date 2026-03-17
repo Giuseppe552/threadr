@@ -15,3 +15,5 @@ export type { BrowsingState } from './cover.js'
 
 export { auditTraffic, ksTest, autocorrelation, runsTest } from './audit.js'
 export type { AuditResult } from './audit.js'
+
+export { generateDecoys, interleaveTargets, identificationProbability } from './decoys.js'
