@@ -1,5 +1,8 @@
 # threadr
 
+[![CI](https://github.com/Giuseppe552/threadr/actions/workflows/ci.yml/badge.svg)](https://github.com/Giuseppe552/threadr/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 OSINT reconnaissance tool for security professionals. Maps relationships between digital identities to help defenders understand their attack surface, verify their own exposure, and investigate incidents.
 
 Feed it an email, domain, or username. It queries public data sources and builds a graph of connected accounts, infrastructure, and metadata.
