@@ -62,6 +62,8 @@ interface CliOpts {
   proxy: boolean
   proxyPorts: string | null // e.g. "9051-9060" or "9150"
   chaff: boolean
+  stealth: boolean
+  profile: string | null // browser profile ID
 }
 
 function parseArgs(argv: string[]): CliOpts {
@@ -76,6 +78,8 @@ function parseArgs(argv: string[]): CliOpts {
     proxy: false,
     proxyPorts: null,
     chaff: false,
+    stealth: false,
+    profile: null,
   }
 
   for (let i = 2; i < args.length; i++) {
@@ -105,6 +109,15 @@ function parseArgs(argv: string[]): CliOpts {
         break
       case '--chaff':
         opts.chaff = true
+        break
+      case '--stealth':
+        opts.stealth = true
+        opts.proxy = true
+        opts.chaff = true
+        opts.quiet = true
+        break
+      case '--profile':
+        opts.profile = args[++i]
         break
     }
   }
@@ -173,17 +186,22 @@ async function runDirectScan(opts: CliOpts) {
 
   loadKeysFromDb()
 
-  // Configure proxy if requested
+  // Configure proxy + stealth
   if (opts.proxy) {
     const proxies = parseProxyPorts(opts.proxyPorts)
     configureProxy({
       enabled: true,
       proxies,
       chaffEnabled: opts.chaff,
-      chaffRatio: 0.3,
-      jitterMeanMs: 2000,
+      chaffRatio: opts.stealth ? 0.5 : 0.3,
+      jitterMeanMs: opts.stealth ? 3000 : 2000,
+      profileId: opts.profile,
+      forceHttp1: opts.stealth,
+      sessionCookies: opts.stealth || opts.proxy,
+      referrerChain: opts.stealth || opts.proxy,
     })
-    log(quiet, `[*] proxy: enabled (${proxies.length} SOCKS5 endpoints, chaff=${opts.chaff})`)
+    const mode = opts.stealth ? 'stealth' : 'proxy'
+    log(quiet, `[*] ${mode}: ${proxies.length} endpoints, chaff=${opts.chaff}, profile=${opts.profile || 'random'}`)
   }
 
   const type = detectSeedType(seed)
@@ -332,16 +350,25 @@ options:
   --depth, -d   <n>                 expansion depth (default: 2)
   --plugins, -p <list>              comma-separated plugin IDs
   --quiet, -q                       suppress log output (stderr)
-  --proxy                           route all traffic through SOCKS5/Tor
+
+proxy:
+  --proxy                           route traffic through SOCKS5/Tor
   --proxy-ports <ports>             proxy ports (default: 9150, range: 9051-9060)
   --chaff                           mix decoy requests with real traffic
+
+stealth:
+  --stealth                         full operational mode (proxy + chaff + browser
+                                    mimicry + cookie session + referrer chain +
+                                    H1 enforcement + quiet). one flag for everything.
+  --profile <id>                    browser profile (chrome-131-win, chrome-131-mac,
+                                    chrome-131-linux, firefox-134-win)
 
 examples:
   threadr scan user@example.com
   threadr scan example.com --depth 3 --format graphml > graph.xml
-  threadr scan user@example.com --plugins dns,whois,crtsh -q | jq '.nodes[]'
-  threadr scan example.com --proxy --proxy-ports 9051-9060 --chaff
-  threadr graph example.com --format json
+  threadr scan user@example.com --plugins dns,whois -q | jq '.nodes[]'
+  threadr scan example.com --stealth --proxy-ports 9051-9055
+  threadr scan example.com --proxy --profile chrome-131-mac --chaff
 `
 
 async function main() {

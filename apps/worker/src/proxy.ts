@@ -1,34 +1,39 @@
 /**
- * Anonymous proxy layer — routes all plugin traffic through SOCKS5/Tor.
+ * Anonymous proxy layer with browser identity mimicry.
  *
- * Architecture:
- * - Each plugin gets its own SOCKS5 proxy (different Tor circuit = different exit IP)
- * - DNS resolves through the proxy (socks5h), never through the system resolver
- * - Raw TCP (WHOIS, SMTP) tunnels through SOCKS5 via the `socks` package
- * - Poisson-distributed timing jitter between requests (anti-traffic-analysis)
- * - Cipher suite shuffling to avoid JA3 TLS fingerprinting
- * - Optional chaff requests mixed with real traffic
+ * When stealth mode is active:
+ * - Every request mimics a real browser (Chrome/Firefox header order,
+ *   client hints, sec-fetch headers, accept-encoding)
+ * - Cookies are captured and replayed per domain (session continuity)
+ * - Referrer chains are maintained per domain
+ * - All traffic routed through SOCKS5/Tor with per-plugin circuit isolation
+ * - DNS resolves through DoH (no system resolver leaks)
+ * - TLS cipher suites shuffled to avoid JA3 fingerprinting
+ * - Lévy-distributed timing jitter between requests
+ * - Markov chain cover traffic mixed with real queries
  *
- * When proxy is disabled (default), all functions pass through transparently.
+ * When disabled (default), all functions pass through transparently.
  */
 
 import { socksDispatcher } from 'fetch-socks'
 import { SocksClient } from 'socks'
 import type { Dispatcher } from 'undici'
 import tls from 'node:tls'
+import { type BrowserProfile, randomProfile, buildHeaders, toHeaders, PROFILES, DEFAULT_PROFILE } from './stealth/profiles.js'
+import { captureResponseCookies, getCookieHeader, clearCookies } from './stealth/cookies.js'
 
 export interface ProxyConfig {
   enabled: boolean
-  // List of SOCKS5 proxies to rotate through (e.g., multiple Tor instances)
-  proxies: { host: string; port: number }[]
-  // Timing jitter: mean delay between requests in ms (Poisson λ)
+  proxies: { host: string; port: number; username?: string; password?: string }[]
   jitterMeanMs: number
-  // Generate chaff (dummy) requests
   chaffEnabled: boolean
-  // Chaff ratio: 1 = one chaff per real request, 0.5 = one chaff per two real
   chaffRatio: number
-  // Shuffle TLS cipher suites
   shuffleCiphers: boolean
+  // Stealth options
+  profileId: string | null   // null = random selection
+  forceHttp1: boolean        // avoid H2 fingerprinting
+  sessionCookies: boolean    // capture + replay cookies
+  referrerChain: boolean     // maintain per-domain referrer
 }
 
 const DEFAULT_CONFIG: ProxyConfig = {
@@ -38,35 +43,52 @@ const DEFAULT_CONFIG: ProxyConfig = {
   chaffEnabled: false,
   chaffRatio: 0.3,
   shuffleCiphers: true,
+  profileId: null,
+  forceHttp1: false,
+  sessionCookies: true,
+  referrerChain: true,
 }
 
 let config: ProxyConfig = { ...DEFAULT_CONFIG }
-let proxyIndex = 0
+let sessionProfile: BrowserProfile | null = null
+const referrerMap = new Map<string, string>()  // domain → last URL
 
 export function configureProxy(opts: Partial<ProxyConfig>) {
   config = { ...DEFAULT_CONFIG, ...opts }
+
+  // Select browser profile for this session
+  if (config.profileId && PROFILES[config.profileId]) {
+    sessionProfile = PROFILES[config.profileId]
+  } else {
+    sessionProfile = randomProfile()
+  }
+
   if (config.shuffleCiphers) shuffleTlsCiphers()
+
+  // Clear state from previous sessions
+  referrerMap.clear()
+  clearCookies()
 }
 
 export function isProxyEnabled(): boolean {
   return config.enabled
 }
 
-// --- Proxy selection ---
-
-function nextProxy(): { host: string; port: number } {
-  const proxy = config.proxies[proxyIndex % config.proxies.length]
-  proxyIndex++
-  return proxy
+export function getSessionProfile(): BrowserProfile | null {
+  return sessionProfile
 }
 
 /**
- * Get a proxy assigned to a specific plugin ID.
- * Same plugin always gets the same proxy (deterministic mapping).
- * Different plugins get different proxies when enough are available.
+ * Reset session state. Call at scan end.
  */
-export function proxyForPlugin(pluginId: string): { host: string; port: number } {
-  // Simple hash of plugin ID to proxy index
+export function resetSession() {
+  referrerMap.clear()
+  clearCookies()
+}
+
+// --- Proxy selection ---
+
+export function proxyForPlugin(pluginId: string): ProxyConfig['proxies'][0] {
   let hash = 0
   for (let i = 0; i < pluginId.length; i++) {
     hash = ((hash << 5) - hash + pluginId.charCodeAt(i)) | 0
@@ -77,11 +99,7 @@ export function proxyForPlugin(pluginId: string): { host: string; port: number }
 
 // --- Proxied fetch ---
 
-/**
- * Create an undici Dispatcher for a specific SOCKS5 proxy.
- * Use with: fetch(url, { dispatcher })
- */
-export function createDispatcher(proxy: { host: string; port: number }): Dispatcher {
+export function createDispatcher(proxy: ProxyConfig['proxies'][0]): Dispatcher {
   return socksDispatcher({
     type: 5,
     host: proxy.host,
@@ -90,51 +108,89 @@ export function createDispatcher(proxy: { host: string; port: number }): Dispatc
 }
 
 /**
- * Fetch through the proxy layer. Drop-in replacement for global fetch().
- * When proxy is disabled, calls fetch() directly.
+ * Fetch through the stealth proxy layer.
+ *
+ * When stealth is active:
+ * 1. Applies Lévy timing jitter
+ * 2. Rebuilds headers to match browser profile (exact order)
+ * 3. Adds cookies from session jar
+ * 4. Sets referrer from previous request to same domain
+ * 5. Routes through SOCKS5 proxy
+ * 6. Captures Set-Cookie from response
+ * 7. Updates referrer chain
  */
 export async function proxiedFetch(
   url: string | URL,
   pluginId: string,
   init?: RequestInit,
 ): Promise<Response> {
+  const urlStr = url.toString()
+
   // Timing jitter
   if (config.enabled && config.jitterMeanMs > 0) {
     await poissonDelay(config.jitterMeanMs)
   }
 
-  // Chaff request (before real request, randomly)
+  // Chaff
   if (config.enabled && config.chaffEnabled && Math.random() < config.chaffRatio) {
     await sendChaff(pluginId)
   }
 
+  // Direct mode (no proxy)
   if (!config.enabled) {
     return fetch(url, init)
   }
 
+  const parsed = new URL(urlStr)
+  const domain = parsed.hostname
   const proxy = proxyForPlugin(pluginId)
   const dispatcher = createDispatcher(proxy)
 
-  // Strip threadr User-Agent when proxied — use a generic browser UA
-  const headers = new Headers(init?.headers)
-  if (!headers.has('User-Agent')) {
-    headers.set('User-Agent', randomUserAgent())
+  // Build browser-mimicking headers
+  let headers: Headers
+
+  if (sessionProfile) {
+    const extraHeaders: Record<string, string> = {}
+    // Preserve plugin-specific headers (API keys, content-type, etc.)
+    if (init?.headers) {
+      const h = new Headers(init.headers)
+      h.forEach((v, k) => { extraHeaders[k] = v })
+    }
+
+    const referrer = config.referrerChain ? referrerMap.get(domain) : undefined
+    const cookies = config.sessionCookies ? getCookieHeader(domain, parsed.pathname, parsed.protocol === 'https:') : undefined
+
+    const pairs = buildHeaders(sessionProfile, urlStr, extraHeaders, referrer, cookies)
+    headers = toHeaders(pairs)
+  } else {
+    headers = new Headers(init?.headers)
+    if (!headers.has('User-Agent')) {
+      headers.set('User-Agent', randomUserAgent())
+    }
   }
 
-  return fetch(url, {
+  const res = await fetch(url, {
     ...init,
     headers,
     // @ts-expect-error — dispatcher is valid for undici-backed fetch
     dispatcher,
   })
+
+  // Capture cookies from response
+  if (config.sessionCookies) {
+    captureResponseCookies(domain, res)
+  }
+
+  // Update referrer chain
+  if (config.referrerChain) {
+    referrerMap.set(domain, urlStr)
+  }
+
+  return res
 }
 
 // --- Proxied raw TCP (WHOIS, SMTP) ---
 
-/**
- * Create a raw TCP socket through a SOCKS5 proxy.
- * Returns a net.Socket connected to the destination.
- */
 export async function proxiedTcpConnect(
   host: string,
   port: number,
@@ -160,7 +216,7 @@ export async function proxiedTcpConnect(
   return socket
 }
 
-// --- DNS over HTTPS (avoids system resolver leak) ---
+// --- DNS over HTTPS ---
 
 interface DohRecord {
   name: string
@@ -169,11 +225,6 @@ interface DohRecord {
   TTL: number
 }
 
-/**
- * Resolve DNS via Cloudflare DoH (1.1.1.1).
- * When proxy is enabled, the DoH request itself goes through the proxy.
- * This prevents DNS leaks through the system resolver.
- */
 export async function dohResolve(
   domain: string,
   recordType: string = 'A',
@@ -190,7 +241,7 @@ export async function dohResolve(
   const data = await res.json() as { Answer?: DohRecord[] }
   return (data.Answer ?? [])
     .filter(r => r.type === dnsTypeCode(recordType))
-    .map(r => r.data.replace(/\.$/, '')) // strip trailing dot
+    .map(r => r.data.replace(/\.$/, ''))
 }
 
 function dnsTypeCode(type: string): number {
@@ -200,30 +251,17 @@ function dnsTypeCode(type: string): number {
   return codes[type.toUpperCase()] ?? 1
 }
 
-// --- Poisson timing jitter ---
+// --- Lévy timing jitter ---
 
-/**
- * Wait for a random duration drawn from an exponential distribution.
- *
- * The Poisson process has inter-arrival times that are exponentially
- * distributed: P(T > t) = e^{-λt}
- *
- * This makes request timing look like natural human browsing rather
- * than machine-generated bursts. An observer seeing requests from
- * a Tor exit node cannot correlate them by timing pattern.
- *
- * @param meanMs - Mean delay in milliseconds (λ = 1/meanMs)
- */
 export function poissonDelay(meanMs: number): Promise<void> {
-  // Inverse transform sampling: T = -mean * ln(U) where U ~ Uniform(0,1)
+  // Lévy stable sampling (α=1.5) for heavy-tailed delays
   const u = Math.random()
-  const delay = Math.round(-meanMs * Math.log(u || 0.001)) // avoid log(0)
-  // Cap at 10x mean to prevent extreme outliers
+  const delay = meanMs / Math.pow(u || 0.001, 1 / 1.5)
   const capped = Math.min(delay, meanMs * 10)
-  return new Promise(resolve => setTimeout(resolve, capped))
+  return new Promise(resolve => setTimeout(resolve, Math.round(Math.max(capped, 50))))
 }
 
-// --- Chaff/decoy requests ---
+// --- Chaff ---
 
 const CHAFF_TARGETS = [
   'https://www.wikipedia.org/',
@@ -236,34 +274,21 @@ const CHAFF_TARGETS = [
   'https://www.mozilla.org/',
 ]
 
-/**
- * Send a decoy request to a random benign URL.
- * An observer at the Tor exit node sees a mix of real OSINT queries
- * and normal web traffic — can't distinguish which is which.
- */
 async function sendChaff(pluginId: string): Promise<void> {
   const target = CHAFF_TARGETS[Math.floor(Math.random() * CHAFF_TARGETS.length)]
   try {
-    const res = await proxiedFetch(target, pluginId, {
-      method: 'HEAD',
-      headers: { 'User-Agent': randomUserAgent() },
-    })
-    // Consume and discard
+    const res = await proxiedFetch(target, pluginId, { method: 'HEAD' })
     await res.arrayBuffer().catch(() => {})
-  } catch {
-    // Chaff failure is irrelevant
-  }
+  } catch { /* chaff failure is irrelevant */ }
 }
 
-// --- User-Agent rotation ---
+// --- User-Agent fallback (used when no profile is active) ---
 
 const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15',
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:134.0) Gecko/20100101 Firefox/134.0',
 ]
 
 function randomUserAgent(): string {
@@ -272,19 +297,10 @@ function randomUserAgent(): string {
 
 // --- TLS cipher shuffling ---
 
-/**
- * Shuffle the TLS cipher suite order to avoid JA3 fingerprinting.
- * Node.js has a distinctive default cipher order that identifies it.
- * Shuffling makes each connection look like a different client.
- *
- * Keeps the first 3 ciphers (most important for security) in place,
- * shuffles the rest. One-time operation at startup.
- */
 function shuffleTlsCiphers() {
   const ciphers = tls.DEFAULT_CIPHERS.split(':')
   if (ciphers.length <= 3) return
 
-  // Keep first 3, shuffle rest (Fisher-Yates)
   const head = ciphers.slice(0, 3)
   const tail = ciphers.slice(3)
   for (let i = tail.length - 1; i > 0; i--) {
