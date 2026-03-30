@@ -84,8 +84,8 @@ export {
 
 export type { BrowsingState, AuditResult } from './anonymity/index.js'
 
-export { jaro, jaroWinkler, compareEntities, computeScore } from './scoring.js'
-export type { EntityFields, MatchCandidate } from './scoring.js'
+export { jaro, jaroWinkler, compareEntities, computeScore, blockingKeys, candidatePairs } from './scoring.js'
+export type { EntityFields, MatchCandidate, IndexedEntity } from './scoring.js'
 
 export {
   fingerprint,

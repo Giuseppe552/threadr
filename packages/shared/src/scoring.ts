@@ -129,3 +129,97 @@ export function computeScore(breakdown: MatchCandidate['breakdown']): number {
 
   return raw
 }
+
+// --- blocking index for entity resolution ---
+//
+// Instead of comparing every pair O(n²), build inverted indexes on
+// exact tokens (emails, usernames, avatar hashes) and name bigrams.
+// Only pairs sharing at least one token become candidates.
+// Complexity: O(n × avg_candidates) where avg_candidates is typically small.
+
+export interface IndexedEntity {
+  index: number
+  fields: EntityFields
+}
+
+/**
+ * Extract blocking keys from an entity.
+ * Each key is a string that, if shared between two entities, makes them
+ * candidates for full comparison.
+ *
+ * Key types:
+ *   e:user@example.com   — exact email (case-insensitive)
+ *   u:johndoe            — exact username (case-insensitive)
+ *   a:abc123             — exact avatar hash
+ *   b:jo                 — character bigram from name (case-insensitive)
+ */
+export function blockingKeys(fields: EntityFields): string[] {
+  const keys: string[] = []
+
+  for (const email of fields.emails) {
+    keys.push(`e:${email.toLowerCase()}`)
+  }
+  for (const username of fields.usernames) {
+    keys.push(`u:${username.toLowerCase()}`)
+  }
+  if (fields.avatarHash) {
+    keys.push(`a:${fields.avatarHash}`)
+  }
+  // Name bigrams catch fuzzy matches (typos, abbreviations)
+  // "John Doe" → ["jo", "oh", "hn", "n ", " d", "do", "oe"]
+  for (const name of fields.names) {
+    const lower = name.toLowerCase()
+    for (let i = 0; i < lower.length - 1; i++) {
+      keys.push(`b:${lower[i]}${lower[i + 1]}`)
+    }
+  }
+
+  return keys
+}
+
+/**
+ * Build a blocking index: maps each blocking key to the set of entity
+ * indexes that contain it. Returns candidate pairs — only these need
+ * full comparison.
+ *
+ * Deduplicates pairs so each (i, j) appears at most once.
+ */
+export function candidatePairs(entities: IndexedEntity[]): [number, number][] {
+  const index = new Map<string, number[]>()
+
+  for (const entity of entities) {
+    const keys = blockingKeys(entity.fields)
+    for (const key of keys) {
+      let bucket = index.get(key)
+      if (!bucket) {
+        bucket = []
+        index.set(key, bucket)
+      }
+      bucket.push(entity.index)
+    }
+  }
+
+  // Collect unique pairs from shared buckets
+  const seen = new Set<string>()
+  const pairs: [number, number][] = []
+
+  for (const bucket of index.values()) {
+    if (bucket.length < 2) continue
+    // Skip overly common keys (e.g., bigram "th" matches half the dataset)
+    // A bucket with >50 entries is noise, not signal
+    if (bucket.length > 50) continue
+    for (let i = 0; i < bucket.length; i++) {
+      for (let j = i + 1; j < bucket.length; j++) {
+        const a = Math.min(bucket[i], bucket[j])
+        const b = Math.max(bucket[i], bucket[j])
+        const key = `${a}:${b}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          pairs.push([a, b])
+        }
+      }
+    }
+  }
+
+  return pairs
+}
