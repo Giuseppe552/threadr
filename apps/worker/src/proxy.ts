@@ -19,6 +19,7 @@ import { socksDispatcher } from 'fetch-socks'
 import { SocksClient } from 'socks'
 import type { Dispatcher } from 'undici'
 import tls from 'node:tls'
+import { createHmac, randomBytes } from 'node:crypto'
 import { type BrowserProfile, randomProfile, buildHeaders, toHeaders, PROFILES, DEFAULT_PROFILE } from './stealth/profiles.js'
 import { captureResponseCookies, getCookieHeader, clearCookies } from './stealth/cookies.js'
 
@@ -51,6 +52,7 @@ const DEFAULT_CONFIG: ProxyConfig = {
 
 let config: ProxyConfig = { ...DEFAULT_CONFIG }
 let sessionProfile: BrowserProfile | null = null
+let sessionNonce: Buffer = randomBytes(32) // changes per configureProxy call
 const referrerMap = new Map<string, string>()  // domain → last URL
 
 export function configureProxy(opts: Partial<ProxyConfig>) {
@@ -64,6 +66,9 @@ export function configureProxy(opts: Partial<ProxyConfig>) {
   }
 
   if (config.shuffleCiphers) shuffleTlsCiphers()
+
+  // New nonce per session — proxy assignment changes each scan
+  sessionNonce = randomBytes(32)
 
   // Clear state from previous sessions
   referrerMap.clear()
@@ -87,13 +92,14 @@ export function resetSession() {
 }
 
 // --- Proxy selection ---
+// HMAC-SHA256 keyed by a per-session nonce so the same pluginId maps to a
+// different proxy each scan. An observer who reads the source code can't
+// predict which exit node handles which plugin without the nonce.
 
 export function proxyForPlugin(pluginId: string): ProxyConfig['proxies'][0] {
-  let hash = 0
-  for (let i = 0; i < pluginId.length; i++) {
-    hash = ((hash << 5) - hash + pluginId.charCodeAt(i)) | 0
-  }
-  const idx = Math.abs(hash) % config.proxies.length
+  const mac = createHmac('sha256', sessionNonce).update(pluginId).digest()
+  // Read first 4 bytes as unsigned 32-bit int, mod proxy count
+  const idx = mac.readUInt32BE(0) % config.proxies.length
   return config.proxies[idx]
 }
 
