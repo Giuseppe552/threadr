@@ -49,7 +49,7 @@ export const keyring: KeyRing = {
     const s = state.get(pluginId)
     if (s) {
       s.burned.add(key)
-      console.log(`[!] key burned for ${pluginId}: ${key.slice(0, 8)}...`)
+      console.log(`[!] key burned for ${pluginId}`)
     }
   },
 }

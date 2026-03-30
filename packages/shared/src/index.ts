@@ -39,7 +39,7 @@ export interface GraphEdge {
 export type SeedType = 'email' | 'domain' | 'username' | 'phone'
 
 export function detectSeedType(seed: string): SeedType {
-  if (seed.includes('@')) return 'email'
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(seed)) return 'email'
   if (seed.includes('.')) return 'domain'
   if (/^\+?\d[\d\s-]{6,}$/.test(seed)) return 'phone'
   return 'username'

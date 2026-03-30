@@ -10,6 +10,11 @@ export function register(p: Plugin) {
 
 const EXPANDABLE: NodeType[] = ['Username', 'Domain', 'IP', 'Repository']
 
+const MAX_DEPTH = 2
+const MAX_BATCH_SIZE = 200
+const MAX_TOTAL_NODES = 2000
+const PLUGIN_TIMEOUT_MS = 30_000
+
 export async function runPlugins(seeds: SeedNode[], keys: KeyRing) {
   let nodes = 0
   let edges = 0
@@ -25,9 +30,10 @@ export async function runPlugins(seeds: SeedNode[], keys: KeyRing) {
         if (p.requiresKey && !keys.get(p.id)) continue
 
         try {
-          const res = await p.run(seed, keys)
+          const res = await withTimeout(p.run(seed, keys), PLUGIN_TIMEOUT_MS, p.id)
 
           for (const n of res.nodes) {
+            if (nodes >= MAX_TOTAL_NODES) break
             await storeNode(n.label, n.key, n.props)
             nodes++
 
@@ -50,12 +56,20 @@ export async function runPlugins(seeds: SeedNode[], keys: KeyRing) {
     return discovered
   }
 
-  const secondary = await runBatch(seeds)
-
-  // FIXME: should probably cap expansion depth at some point
-  if (secondary.length > 0) {
-    console.log(`[*] expanding ${secondary.length} discovered nodes`)
-    await runBatch(secondary)
+  let current = seeds
+  for (let depth = 0; depth < MAX_DEPTH && current.length > 0; depth++) {
+    if (depth > 0) {
+      console.log(`[*] depth ${depth}: expanding ${current.length} discovered nodes`)
+    }
+    if (current.length > MAX_BATCH_SIZE) {
+      console.log(`[!] batch ${current.length} exceeds limit, truncating to ${MAX_BATCH_SIZE}`)
+      current = current.slice(0, MAX_BATCH_SIZE)
+    }
+    if (nodes >= MAX_TOTAL_NODES) {
+      console.log(`[!] total node limit reached (${nodes}), stopping expansion`)
+      break
+    }
+    current = await runBatch(current)
   }
 
   await resolve()
@@ -65,4 +79,16 @@ export async function runPlugins(seeds: SeedNode[], keys: KeyRing) {
 
 export function getPlugins() {
   return plugins.map(p => ({ id: p.id, name: p.name, accepts: p.accepts, requiresKey: p.requiresKey }))
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out (${ms}ms)`)), ms)
+  })
+  try {
+    return await Promise.race([promise, timeout])
+  } finally {
+    clearTimeout(timer!)
+  }
 }
