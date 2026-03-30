@@ -1,6 +1,6 @@
 import { detectSeedType } from '@threadr/shared'
 import type { SeedNode, NodeType } from '@threadr/shared'
-import { storeNode, storeEdge } from './graph.js'
+import { storeNode, storeEdge, resetGraphHealth } from './graph.js'
 import { register, runPlugins } from './runner.js'
 import { keyring } from './keyring.js'
 
@@ -48,6 +48,8 @@ const seedTypeToNode: Record<string, { label: NodeType; key: string }> = {
 }
 
 export async function runScan(_scanId: string, seed: string) {
+  // Allow neo4j to retry if it was previously marked down
+  resetGraphHealth()
   console.log(`[*] scanning: ${seed}`)
 
   const type = detectSeedType(seed)
