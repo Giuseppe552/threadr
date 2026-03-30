@@ -184,7 +184,7 @@ async function runDirectScan(opts: CliOpts) {
     process.exit(1)
   }
 
-  loadKeysFromDb()
+  await loadKeysFromDb()
 
   // Configure proxy + stealth
   if (opts.proxy) {

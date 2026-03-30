@@ -4,7 +4,7 @@ import { db } from './db.js'
 import { loadKeysFromDb } from './keyring.js'
 import { checkDueMonitors } from './monitor.js'
 
-loadKeysFromDb()
+await loadKeysFromDb()
 
 const worker = new Worker(
   'scans',

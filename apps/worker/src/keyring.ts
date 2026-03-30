@@ -1,4 +1,5 @@
 import type { KeyRing } from '@threadr/shared'
+import { deriveEncryptionKey, decryptData } from '@threadr/shared'
 import { db } from './db.js'
 
 interface KeyState {
@@ -13,18 +14,56 @@ export function loadKeys(pluginId: string, keys: string[]) {
   state.set(pluginId, { keys, current: 0, burned: new Set() })
 }
 
-export function loadKeysFromDb() {
+/**
+ * Load API keys from SQLite.
+ *
+ * If KEY_ENCRYPTION_SECRET is set, keys are decrypted with AES-256-GCM
+ * (HKDF-derived from the secret). If not set, keys are read as plaintext
+ * for backwards compatibility during migration.
+ */
+export async function loadKeysFromDb() {
+  const secret = process.env.KEY_ENCRYPTION_SECRET
+  let encKey: CryptoKey | null = null
+  if (secret) {
+    encKey = await deriveEncryptionKey(new TextEncoder().encode(secret))
+  }
+
   const rows = db.prepare('SELECT plugin_id, key_value FROM api_keys WHERE active = 1').all() as { plugin_id: string; key_value: string }[]
   const grouped = new Map<string, string[]>()
+
   for (const r of rows) {
+    let plainKey: string
+    if (encKey && looksEncrypted(r.key_value)) {
+      const bytes = Buffer.from(r.key_value, 'base64')
+      plainKey = await decryptData(encKey, new Uint8Array(bytes))
+    } else {
+      plainKey = r.key_value
+    }
     const arr = grouped.get(r.plugin_id) || []
-    arr.push(r.key_value)
+    arr.push(plainKey)
     grouped.set(r.plugin_id, arr)
   }
+
   for (const [pid, keys] of grouped) {
     loadKeys(pid, keys)
   }
-  console.log(`[*] loaded keys for ${grouped.size} plugins`)
+  console.log(`[*] loaded keys for ${grouped.size} plugins${encKey ? ' (encrypted)' : ''}`)
+}
+
+/**
+ * Encrypted values are base64-encoded and at least 28 chars
+ * (12 bytes IV + 16 bytes auth tag minimum).
+ * Plaintext API keys are typically alphanumeric with hyphens.
+ */
+function looksEncrypted(value: string): boolean {
+  if (value.length < 28) return false
+  try {
+    const bytes = Buffer.from(value, 'base64')
+    // IV (12) + at least 1 byte ciphertext + auth tag (16) = 29 minimum
+    return bytes.length >= 29
+  } catch {
+    return false
+  }
 }
 
 export const keyring: KeyRing = {

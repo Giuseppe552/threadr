@@ -5,7 +5,7 @@ import { Queue } from 'bullmq'
 import { randomUUID } from 'node:crypto'
 import { db } from './db.js'
 import { getGraph, getMerges, confirmMerge, rejectMerge } from './graph.js'
-import { toGraphML } from '@threadr/shared'
+import { toGraphML, deriveEncryptionKey, encryptData } from '@threadr/shared'
 import { detectSeedType } from './graphml.js'
 
 const scanQueue = new Queue('scans', {
@@ -165,7 +165,15 @@ app.post('/settings/keys', async (c) => {
   if (!plugin_id || !key_value) return c.json({ error: 'plugin_id and key_value required' }, 400)
 
   const id = randomUUID()
-  db.prepare('INSERT INTO api_keys (id, plugin_id, key_value, label) VALUES (?, ?, ?, ?)').run(id, plugin_id, key_value, label || '')
+  const secret = process.env.KEY_ENCRYPTION_SECRET
+  let stored = key_value
+  if (secret) {
+    const encKey = await deriveEncryptionKey(new TextEncoder().encode(secret))
+    const encrypted = await encryptData(encKey, key_value)
+    stored = Buffer.from(encrypted).toString('base64')
+  }
+
+  db.prepare('INSERT INTO api_keys (id, plugin_id, key_value, label) VALUES (?, ?, ?, ?)').run(id, plugin_id, stored, label || '')
   return c.json({ id, plugin_id, label }, 201)
 })
 
